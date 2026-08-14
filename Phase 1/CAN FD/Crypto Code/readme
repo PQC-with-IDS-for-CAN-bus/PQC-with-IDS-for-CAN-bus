@@ -1,0 +1,37 @@
+# Phase 1: Cryptographic Engine & CAN-FD Protocol Layer
+
+This directory contains the production-ready reference implementation of the cryptographic primitives, CAN-FD byte-wise frame schemas, and the end-to-end boot handshake state machine for the **Post-Quantum In-Vehicle CAN-FD Security Architecture**.
+
+---
+
+## 📂 Directory Structure
+
+```text
+Crypto/Code/
+├── ascon_official.py          # Official reference NIST SP 800-232 Ascon-AEAD128 implementation
+├── crypto_engine.py           # Core cryptographic primitives (PUF, HKDF, ML-DSA-44, Ascon, RNG)
+├── canfd_schema.py            # CAN-FD frame encoders/decoders & fragmentation managers
+├── handshake_simulation.py    # Master end-to-end boot handshake simulation (Steps 1–9)
+├── verify_phase1_smoke.py     # Automated technical checklist & smoke-test verifier
+└── README.md                  # Module documentation (this file)
+```
+
+---
+
+## 🔐 Architecture Overview
+
+The system establishes a **Logical Pure-Star Security Architecture** over 4 physically segmented CAN-FD domains (Powertrain, Chassis, Body & Comfort, Infotainment) managed by a central **Central Intelligent Security Gateway (CISG)**.
+
+```text
+                  Phase 1 Cryptographic Stack
+                               │
+            ┌──────────────────┴──────────────────┐
+            │                                     │
+    crypto_engine.py                       canfd_schema.py
+  (Mathematical Layer)                    (Protocol Layer)
+            │                                     │
+   ├── PUFEmulator (SRAM-PUF)            ├── ChallengeFrame (Cat 3.1)
+   ├── KeyDerivation (HKDF-SHA256)       ├── AttestationDeliveryManager (Cat 2)
+   ├── PostQuantumAttestation (ML-DSA-44)├── KeyDeliveryFrame (Cat 3.3)
+   ├── AsconAEAD128Engine (NIST SP 800)  ├── ProtectedRuntimeFrame (Cat 1)
+   └── SessionManager (CSPRNG)           └── GatewayIDSExtractor (12D Vector)
