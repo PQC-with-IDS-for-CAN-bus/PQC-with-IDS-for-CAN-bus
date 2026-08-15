@@ -28,8 +28,7 @@ This repository contains the reference Python implementation, unit test suite, a
 │   └── send_test_attestation.py   # ECU traffic simulator with NACK recovery
 ├── canfd_bytewise_schematics.md   # Byte-level frame layout & signal mappings
 ├── scratch_canfd_arch.txt         # Physical CAN-FD topology & isolation rules
-├── scratch_trust_boundary.txt     # Security architecture & adversary model
-└── .gitignore                     # Git ignore file for OS/Build artifacts
+└── scratch_trust_boundary.txt     # Security architecture & adversary model
 ```
 
 ## Running the Code & Tests
