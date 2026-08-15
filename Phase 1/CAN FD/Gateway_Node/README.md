@@ -19,7 +19,8 @@ Gateway_Node/
 │   ├── main.cpp                   # Event loop, vcan0 socket, and IPC bridge
 │   └── routing_engine.cpp         # Domain routing logic
 ├── crypto_bridge_server.py        # IPC TCP Server for ML-DSA-44 verification
-└── send_test_attestation.py       # Simulated ECU injector with NACK recovery
+├── send_test_attestation1.py       # Simulated ECU injector without NACK recovery
+└── send_test_attestation2.py       # Simulated ECU injector with NACK recovery
 ```
 
 ## Architecture Overview
@@ -42,35 +43,35 @@ C++ Gateway Node (Network Layer)
 ```
 ## Module Inventory & Responsibilities
 
-### 1. block_transfer.cpp (Reliability & Reassembly)
+### 1. `block_transfer.cpp` (Reliability & Reassembly)
 * Indexed Reassembly: Ingests up to 41 sequence indices, placing 60-byte payload chunks at precise offsets within the 2436-byte PAO buffer.
 * Bitmap Tracking: Maintains a strict std::array<bool, 41> to track frame arrivals and reject duplicate replays.
 * Selective Retransmission: Exposes get_missing_blocks() to dynamically compute dropped sequence indices for NACK generation.
 
-### 2. main.cpp (The Core Event Loop)
-+ Raw Socket Management: Binds directly to vcan0 with CAN-FD extensions enabled.
-+ Timeout & NACK Generation: Implements a 500ms SO_RCVTIMEO socket timeout. If a block transfer stalls, it broadcasts a 0x201 NACK frame containing the missing indices. Enforces a strict 3-retry limit before aborting a dead session.
-+ IPC Handshake: Initiates a TCP connection to 127.0.0.1:5000 to offload the reassembled 2436-byte buffer and awaits a 1-byte (0x01 or 0x00) validation response from Python.
+### 2. `main.cpp` (The Core Event Loop)
++ Raw Socket Management: Binds directly to `vcan0` with CAN-FD extensions enabled.
++ Timeout & NACK Generation: Implements a 500ms SO_RCVTIMEO socket timeout. If a block transfer stalls, it broadcasts a `0x201` NACK frame containing the missing indices. Enforces a strict 3-retry limit before aborting a dead session.
++ IPC Handshake: Initiates a TCP connection to `127.0.0.1:5000` to offload the reassembled 2436-byte buffer and awaits a 1-byte (`0x01` or `0x00`) validation response from Python.
 
-### 3. ids_extractor.cpp (Machine Learning Hooks)
+### 3. `ids_extractor.cpp` (Machine Learning Hooks)
 * Feature Vector Generation: Intercepts Category 1 Runtime Frames (after decryption/authentication) and translates raw CAN identifiers, DLCs, and timing gaps into standardized 12D vectors[cite: 7].
 * Zero-Fill Enforcement: If the Ascon-AEAD128 tag is invalid, enforces the Integration Contract by replacing the payload features with zeroes to prevent tampered data from poisoning the LSTM Autoencoder.
 
-### 4. crypto_bridge_server.py
+### 4. `crypto_bridge_server.py`
 * A lightweight TCP listener that ingests the 2436B PAO from the C++ Gateway, slices out the 2420-byte ML-DSA-44 signature, and invokes the FIPS 204 verifier.
 
-### 5. send_test_attestation.py
-* An ECU network simulator that fragments a real ML-DSA-44 signature into 41 CAN-FD frames, injects them onto vcan0, and actively listens for gateway NACKs to seamlessly retransmit intentionally dropped packets.
+### 5. `send_test_attestation.py`
+* An ECU network simulator that fragments a real ML-DSA-44 signature into 41 CAN-FD frames, injects them onto `vcan0`, and actively listens for gateway NACKs to seamlessly retransmit intentionally dropped packets.
 
 ## Installation & Running
 
 ### Prerequisites
 * CMake 3.10
 * GCC / G++ with C++17 support
-* Linux can-utils (for vcan0 virtual interface)
+* Linux `can-utils` (for `vcan0` virtual interface)
 
 ### 1. Build the C++ Gateway
-```
+```bash
 mkdir build
 cd build
 cmake ..
@@ -80,16 +81,17 @@ make
 
 Open three separate terminal windows
 Terminal 1: Start the Python IPC Bridge
-```
+```bash
 python crypto_bridge_server.py
 # Listens on 127.0.0.1:5000
 ```
 Terminal 2: Start the C++ Gateway
-```./build/cisg_router
+```bash
+./build/cisg_router
 # Binds to vcan0 and awaits Category 2 and Category 1 frames
 ```
 Terminal 3: Inject the Test Traffic
-```
+```bash
 python send_test_attestation.py
 # Fires the 41-frame burst, intentionally drops a frame, and tests NACK recovery
 ```
