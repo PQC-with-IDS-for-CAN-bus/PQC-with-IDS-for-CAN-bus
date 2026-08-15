@@ -20,15 +20,12 @@ This repository contains the reference Python implementation, unit test suite, a
 │   ├── crypto_engine.py           # Core ML-DSA, HKDF, and PUF math
 │   ├── handshake_simulation.py    # Master end-to-end boot handshake simulation
 │   └── test_canfd_schema.py       # Unit tests (unittest framework)
-├── Gateway_Node/                  # C++ Central Gateway Architecture
+└── Gateway_Node/                  # C++ Central Gateway Architecture
 │   ├── CMakeLists.txt             # C++ build configuration
 │   ├── include/                   # Headers for routing, IDS, and block transfer
 │   ├── src/                       # Gateway event loop and NACK state machines
 │   ├── crypto_bridge_server.py    # Python IPC TCP server for crypto offloading
 │   └── send_test_attestation.py   # ECU traffic simulator with NACK recovery
-├── canfd_bytewise_schematics.md   # Byte-level frame layout & signal mappings
-├── scratch_canfd_arch.txt         # Physical CAN-FD topology & isolation rules
-└── scratch_trust_boundary.txt     # Security architecture & adversary model
 ```
 
 ## Running the Code & Tests
