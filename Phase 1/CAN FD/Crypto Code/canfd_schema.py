@@ -520,40 +520,200 @@ class KeyDeliveryFrame:
         return k_i
 
 
+
+# ---------------------------------------------------------------------------
+# Gateway IDS Feature Profile Definitions
+# ---------------------------------------------------------------------------
+# Each profile is a tuple of canonical feature name strings.  The profile
+# name is the single top-level selector that drives all downstream code
+# (CANDatasetPreprocessor, LSTMAutoencoder, threshold calibration, red-team
+# benchmark scoring).  No wire format or crypto changes are needed to switch
+# profiles — all signals are already present in the decrypted 40-byte payload.
+#
+# Profiles:
+#   12D_LEGACY        — Original Phase 1 baseline (6 header/crypto + 6 raw
+#                       telemetry signals).  Retained for historical benchmarking.
+#
+#   12D_ENHANCED      — Same 12 slots as LEGACY, but two improvements:
+#                         · delta_t replaced by frame_density (trailing causal
+#                           window), which is ~100× OOD during a DoS flood.
+#                         · Core telemetry replaced by EMA-deviation signals,
+#                           which spike sharply on masquerade injection while
+#                           remaining ≈0 during forward-fill carry-forward.
+#
+#   18D_FULL_FRAME    — All 12 raw physical signals from the 40-byte payload
+#                       plus the 6 header/crypto fields.  Unlocks Throttle,
+#                       Lateral/Longitudinal Accel, Wheel_FR, Gear, and DTC
+#                       that were previously discarded after decryption.
+#                       Enables correlated multi-axis masquerade detection.
+# ---------------------------------------------------------------------------
+
+IDS_PROFILES: Dict[str, tuple] = {
+    "12D_LEGACY": (
+        "delta_t",           # f1  : raw inter-arrival time (ms)
+        "counter_gap",       # f2  : monotonic counter jump
+        "ecu_id_norm",       # f3  : normalised SENDER_ECU_ID
+        "domain_id",         # f4  : DOMAIN_ID (routing metadata)
+        "msg_type",          # f5  : message type nibble
+        "tag_status",        # f6  : Ascon-AEAD128 tag verification result
+        "speed",             # f7  : Vehicle Speed (km/h)
+        "rpm",               # f8  : Engine RPM
+        "steering",          # f9  : Steering Angle (deg)
+        "brake",             # f10 : Brake Pressure (kPa)
+        "long_accel",        # f11 : Longitudinal Accel (m/s^2)
+        "dtc_flags",         # f12 : DTC Error Bit Count
+    ),
+
+    "12D_ENHANCED": (
+        "frame_density",     # f1  : trailing causal frame-rate (fps, W=20)
+                             #       replaces raw delta_t — during a 20 kHz DoS
+                             #       flood this is ~100–200× above the training
+                             #       distribution, guaranteeing MSE explosion.
+        "counter_gap",       # f2  : monotonic counter jump
+        "ecu_id_norm",       # f3  : normalised SENDER_ECU_ID
+        "domain_id",         # f4  : DOMAIN_ID (routing metadata)
+        "msg_type",          # f5  : message type nibble
+        "tag_status",        # f6  : Ascon-AEAD128 tag verification result
+        "speed_ema_dev",     # f7  : Vehicle Speed deviation from causal EMA
+        "rpm",               # f8  : Engine RPM (low-variance, raw kept)
+        "steering_ema_dev",  # f9  : Steering Angle deviation from causal EMA
+        "brake",             # f10 : Brake Pressure (raw kept)
+        "wheel_fl_ema_dev",  # f11 : Wheel Speed FL deviation from causal EMA
+        "coolant_ema_dev",   # f12 : Coolant Temp deviation from causal EMA
+                             #       EMA deviations are ≈0 during forward-fill
+                             #       carry-forward and spike sharply on masquerade
+                             #       injection — exactly what the autoencoder
+                             #       learns to reconstruct as zero.
+    ),
+    "18D_FULL_FRAME": (
+        "frame_density",     # f1  : trailing causal frame-rate (fps, W=20)
+        "counter_gap",       # f2  : monotonic counter jump
+        "ecu_id_norm",       # f3  : normalised SENDER_ECU_ID
+        "domain_id",         # f4  : DOMAIN_ID (routing metadata)
+        "msg_type",          # f5  : message type nibble
+        "tag_status",        # f6  : Ascon-AEAD128 tag verification result
+        "speed",             # f7  : Vehicle Speed (km/h) — payload +00..+03
+        "rpm",               # f8  : Engine RPM           — payload +04..+07
+        "steering",          # f9  : Steering Angle        — payload +08..+11
+        "brake",             # f10 : Brake Pressure        — payload +12..+15
+        "throttle",          # f11 : Throttle Position (%)  — payload +16..+19 [WAS DISCARDED]
+        "long_accel",        # f12 : Longitudinal Accel     — payload +20..+23 [WAS DISCARDED]
+        "lat_accel",         # f13 : Lateral Accel          — payload +24..+27 [WAS DISCARDED]
+        "wheel_fl",          # f14 : Wheel Speed FL         — payload +28..+29
+        "wheel_fr",          # f15 : Wheel Speed FR         — payload +30..+31 [WAS DISCARDED]
+        "coolant",           # f16 : Engine Temp/Coolant    — payload +32..+33
+        "gear",              # f17 : Gear Status bitmask    — payload +34..+35 [WAS DISCARDED]
+        "dtc_flags",         # f18 : DTC Error Bit Count    — payload +36..+39 [WAS DISCARDED]
+    ),
+}
+
+# Active default profile used by GatewayIDSExtractor if not specified.
+# Defaults to '12D_LEGACY' for 100% backward compatibility with Phase 1 unit tests.
+# Phase 2 ML-IDS instantiates GatewayIDSExtractor(profile="12D_ENHANCED") or "18D_FULL_FRAME".
+ACTIVE_IDS_PROFILE: str = "12D_LEGACY"
+
+
+
 class GatewayIDSExtractor:
     """
-    Tapan's Feature Extraction Hook: Converts decrypted frames & AD metadata into 12D LSTM vectors.
+    Tapan's Feature Extraction Hook: Converts decrypted 64-byte CAN-FD frames
+    and gateway-derived metadata into an N-dimensional LSTM feature vector.
 
-    Note on Feature Scaling:
-    Telemetry features (Vehicle Speed in km/h, Engine RPM, Steering Angle, Brake Pressure, etc.)
-    are emitted in raw, unscaled physical engineering units. Feature normalization (StandardScaler /
-    MinMaxScaler) is performed during Phase 2 model training and edge ONNX pipeline preprocessing.
+    Feature Profile
+    ---------------
+    The active profile is controlled by the module-level ``ACTIVE_IDS_PROFILE``
+    constant (see ``IDS_PROFILES`` above).  Three profiles are defined:
+
+        12D_LEGACY     — original Phase 1 baseline (backward-compatible)
+        12D_ENHANCED   — recommended Phase 2 profile (same slot count,
+                         improved DoS and masquerade detection)
+        18D_FULL_FRAME — full 40-byte payload utilisation
+
+    Backward Compatibility
+    ----------------------
+    The public method signature of ``extract_features()`` is unchanged.  Code
+    that calls ``extractor.extract_features(frame, payload, tag_valid)`` will
+    continue to work; it will simply receive a vector whose length equals
+    ``len(IDS_PROFILES[ACTIVE_IDS_PROFILE])`` instead of the hardcoded 12.
+
+    Note on Feature Scaling
+    -----------------------
+    All values are emitted in raw physical engineering units.  MinMax
+    normalisation is applied in the Phase 2 ``CANDatasetPreprocessor`` during
+    training and edge ONNX pipeline preprocessing.
     """
 
-    def __init__(self):
+    # Causal trailing window size for frame_density computation (frames).
+    DENSITY_WINDOW: int = 20
+
+    # EMA smoothing factor (α).  A value of 0.05 gives a slow-tracking
+    # exponential moving average — normal forward-fill carry-forward produces
+    # near-zero deviations while a sudden masquerade injection produces a
+    # large spike.
+    EMA_ALPHA: float = 0.05
+
+    def __init__(self, profile: str = ACTIVE_IDS_PROFILE) -> None:
+        """
+        Parameters
+        ----------
+        profile : str
+            One of the keys in ``IDS_PROFILES``.  Defaults to the module-level
+            ``ACTIVE_IDS_PROFILE`` constant.
+        """
+        if profile not in IDS_PROFILES:
+            raise ValueError(
+                f"Unknown IDS profile '{profile}'. "
+                f"Valid options: {list(IDS_PROFILES.keys())}"
+            )
+        self.profile: str = profile
+        self.feature_names: tuple = IDS_PROFILES[profile]
+        self.num_features: int = len(self.feature_names)
+
+        # Per-ECU stateful trackers (keyed by sender_ecu_id)
         self.last_timestamps: Dict[int, float] = {}
         self.last_counters: Dict[int, int] = {}
 
+        # Causal circular delta-t buffer for frame_density (per ECU)
+        self._delta_t_buffer: Dict[int, list] = {}
+
+        # EMA state for each physical telemetry channel (per ECU)
+        # Keys: 'speed', 'steering', 'wheel_fl', 'coolant'
+        self._ema: Dict[int, Dict[str, float]] = {}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
     def reset_session_counter(self, sender_ecu_id: int) -> None:
         """
-        Resets the monotonic counter and timestamp baseline for an ECU.
-        Must be called upon Step 5 Session Key Delivery (re-attestation / new K_i provision)
-        so fresh session counters starting at 0 are not rejected against old session high-water marks.
+        Resets the monotonic counter, timestamp, density buffer, and EMA state
+        for an ECU.  Must be called upon Step 5 Session Key Delivery
+        (re-attestation / new K_i provision) so that fresh session counters
+        starting at 0 are not rejected against old session high-water marks.
         """
         self.last_counters.pop(sender_ecu_id, None)
         self.last_timestamps.pop(sender_ecu_id, None)
+        self._delta_t_buffer.pop(sender_ecu_id, None)
+        self._ema.pop(sender_ecu_id, None)
 
     def check_monotonic_counter_gate(self, sender_ecu_id: int, counter: int) -> bool:
         """
         Step 7b Monotonic Counter Gate (Hard Reject).
+
         Enforces strict monotonic increment per SENDER_ECU_ID.
-        Must be called BEFORE extract_features().
-        Returns True if counter is strictly greater than last accepted value (or first frame).
-        Returns False if counter is <= last accepted value (Replay / Stale Attack -> Drop Frame).
+        Must be called BEFORE ``extract_features()``.
+
+        Returns
+        -------
+        bool
+            True  — counter is strictly greater than the last accepted value
+                    (or this is the first frame for this ECU).
+            False — counter is ≤ last accepted value → Replay / Stale Attack
+                    → caller must DROP FRAME.
         """
         last_c = self.last_counters.get(sender_ecu_id, None)
         if last_c is not None and counter <= last_c:
-            return False  # Replayed or stale counter -> HARD REJECT
+            return False
         return True
 
     def extract_features(
@@ -564,62 +724,139 @@ class GatewayIDSExtractor:
         arrival_time: float = None,
     ) -> List[float]:
         """
-        Extracts 12D feature vector for ONNX LSTM IDS inspection.
-        
-        Invariant:
-        This method must only be invoked on frames that passed Step 7b (check_monotonic_counter_gate).
+        Extract the N-dimensional IDS feature vector from one runtime frame.
+
+        This method must only be invoked on frames that already passed Step 7b
+        (``check_monotonic_counter_gate``).  It is safe to call on
+        tag-failed frames — the telemetry slots will be zero-filled per the
+        Failed-Tag Handling policy defined in CAN-FD Schematic v1.6, §3.6.
+
+        Parameters
+        ----------
+        frame_bytes : bytes
+            Full 64-byte Category 1 CAN-FD frame (header + ciphertext + tag).
+        decrypted_payload : bytes
+            40-byte plaintext telemetry payload (output of Ascon decryption).
+        is_tag_valid : bool
+            True if the Ascon-AEAD128 tag verification passed; False otherwise.
+        arrival_time : float, optional
+            Gateway wall-clock timestamp in milliseconds.  Defaults to
+            ``time.time() * 1000.0`` if not supplied.
+
+        Returns
+        -------
+        List[float]
+            Feature vector of length ``self.num_features``, ordered according
+            to ``self.feature_names``.
         """
         if arrival_time is None:
             arrival_time = time.time() * 1000.0  # ms
 
-        # Unpack 8-byte header
+        # ── Header Unpacking ──────────────────────────────────────────────
         ver_type, sender_ecu_id, domain_id, flags, counter = struct.unpack(
             ProtectedRuntimeFrame.UNENCRYPTED_HEADER_FMT, frame_bytes[:8]
         )
-
         msg_type = ver_type & 0x0F
 
-        # Compute delta time
+        # ── Inter-Arrival Time (Δt) ───────────────────────────────────────
         prev_t = self.last_timestamps.get(sender_ecu_id, arrival_time)
-        delta_t = arrival_time - prev_t
+        delta_t = max(0.0, arrival_time - prev_t)  # ms, causal (never negative)
 
-        # Compute counter gap
+        # ── Causal Trailing Frame-Density ─────────────────────────────────
+        # Push delta_t into the per-ECU circular buffer BEFORE updating
+        # last_timestamp so that the current frame's Δt is included.
+        buf = self._delta_t_buffer.setdefault(sender_ecu_id, [])
+        buf.append(delta_t if delta_t > 0.0 else 0.001)  # floor at 1 µs
+        if len(buf) > self.DENSITY_WINDOW:
+            buf.pop(0)
+        # fps = W / Σ(Δt_i)  where Δt is in ms → fps = W / (Σ ms / 1000)
+        sum_dt_ms = sum(buf)
+        frame_density = (len(buf) * 1000.0 / sum_dt_ms) if sum_dt_ms > 0.0 else 0.0
+
+        # ── Monotonic Counter Gap ─────────────────────────────────────────
         prev_c = self.last_counters.get(sender_ecu_id, counter - 1)
         counter_gap = max(0, counter - prev_c - 1)
 
-        # Update baseline state only for cryptographically valid frames
+        # ── Update Stateful Baselines (only on valid frames) ──────────────
         if is_tag_valid:
             self.last_timestamps[sender_ecu_id] = arrival_time
             self.last_counters[sender_ecu_id] = counter
 
         tag_status = 0.0 if is_tag_valid else 1.0
 
+        # ── Telemetry Decoding ────────────────────────────────────────────
         if is_tag_valid and len(decrypted_payload) == ProtectedRuntimeFrame.PAYLOAD_SIZE:
-            telemetry = ProtectedRuntimeFrame.unpack_telemetry_payload(decrypted_payload)
-            speed = telemetry["vehicle_speed"]
-            rpm = telemetry["engine_rpm"]
-            steering = telemetry["steering_angle"]
-            brake = telemetry["brake_pressure"]
-            long_accel = telemetry["long_accel"]
-            dtc = float(bin(telemetry["diagnostic_flags"]).count("1"))
+            t = ProtectedRuntimeFrame.unpack_telemetry_payload(decrypted_payload)
+            speed      = float(t["vehicle_speed"])
+            rpm        = float(t["engine_rpm"])
+            steering   = float(t["steering_angle"])
+            brake      = float(t["brake_pressure"])
+            throttle   = float(t["throttle_pos"])
+            long_accel = float(t["long_accel"])
+            lat_accel  = float(t["lat_accel"])
+            wheel_fl   = float(t["wheel_speed_fl"])
+            wheel_fr   = float(t["wheel_speed_fr"])
+            coolant    = float(t["engine_temp"])
+            gear       = float(t["gear_status"])
+            dtc_bits   = float(bin(t["diagnostic_flags"]).count("1"))
         else:
-            # Default zero values if tag invalid / payload corrupted
-            speed = rpm = steering = brake = long_accel = dtc = 0.0
+            # Failed-Tag Handling: zero-fill all telemetry slots.
+            # This matches the policy in CAN-FD Schematic v1.6, §3.6 —
+            # corrupted ciphertext must not pollute the LSTM sequence state.
+            speed = rpm = steering = brake = throttle = long_accel = 0.0
+            lat_accel = wheel_fl = wheel_fr = coolant = gear = dtc_bits = 0.0
 
-        return [
-            float(delta_t),
-            float(counter_gap),
-            float(sender_ecu_id) / 255.0,
-            float(domain_id),
-            float(msg_type),
-            float(tag_status),
-            float(speed),
-            float(rpm),
-            float(steering),
-            float(brake),
-            float(long_accel),
-            float(dtc),
-        ]
+        # ── EMA-Deviation Computation (causal, per-ECU) ───────────────────
+        # EMA tracks the slow-moving background level of each channel.
+        # Normal forward-fill carry-forward: raw value ≈ EMA → deviation ≈ 0.
+        # Masquerade injection:  raw value jumps suddenly → deviation spikes.
+        ema_state = self._ema.setdefault(sender_ecu_id, {
+            "speed": speed, "steering": steering,
+            "wheel_fl": wheel_fl, "coolant": coolant,
+        })
+        α = self.EMA_ALPHA
+        ema_state["speed"]    = α * speed    + (1 - α) * ema_state["speed"]
+        ema_state["steering"] = α * steering + (1 - α) * ema_state["steering"]
+        ema_state["wheel_fl"] = α * wheel_fl + (1 - α) * ema_state["wheel_fl"]
+        ema_state["coolant"]  = α * coolant  + (1 - α) * ema_state["coolant"]
+
+        speed_ema_dev    = speed    - ema_state["speed"]
+        steering_ema_dev = steering - ema_state["steering"]
+        wheel_fl_ema_dev = wheel_fl - ema_state["wheel_fl"]
+        coolant_ema_dev  = coolant  - ema_state["coolant"]
+
+        # ── Profile-Driven Feature Assembly ──────────────────────────────
+        _slot_map = {
+            # Timing / bus
+            "delta_t":           float(delta_t),
+            "frame_density":     float(frame_density),
+            # Protocol / crypto
+            "counter_gap":       float(counter_gap),
+            "ecu_id_norm":       float(sender_ecu_id) / 255.0,
+            "domain_id":         float(domain_id),
+            "msg_type":          float(msg_type),
+            "tag_status":        float(tag_status),
+            # Raw telemetry (all 12 physical signals from the 40B payload)
+            "speed":             speed,
+            "rpm":               rpm,
+            "steering":          steering,
+            "brake":             brake,
+            "throttle":          throttle,
+            "long_accel":        long_accel,
+            "lat_accel":         lat_accel,
+            "wheel_fl":          wheel_fl,
+            "wheel_fr":          wheel_fr,
+            "coolant":           coolant,
+            "gear":              gear,
+            "dtc_flags":         dtc_bits,
+            # EMA-deviation telemetry (12D_ENHANCED slots)
+            "speed_ema_dev":     speed_ema_dev,
+            "steering_ema_dev":  steering_ema_dev,
+            "wheel_fl_ema_dev":  wheel_fl_ema_dev,
+            "coolant_ema_dev":   coolant_ema_dev,
+        }
+
+        return [_slot_map[name] for name in self.feature_names]
 
 
 # Self-test code
@@ -648,8 +885,16 @@ if __name__ == "__main__":
 
     extractor = GatewayIDSExtractor()
     vec = extractor.extract_features(full_frame, payload, is_tag_valid=True)
-    print("Extracted 12D Feature Vector:", vec)
-    assert len(vec) == 12
+    expected_dim = extractor.num_features
+    print(f"Extracted {expected_dim}D Feature Vector (profile={extractor.profile}): {vec}")
+    assert len(vec) == expected_dim, f"Feature vector length mismatch: got {len(vec)}, expected {expected_dim}"
+    # Sanity-check all three profiles produce valid vectors
+    for profile_name in IDS_PROFILES:
+        ext = GatewayIDSExtractor(profile=profile_name)
+        v = ext.extract_features(full_frame, payload, is_tag_valid=True)
+        assert len(v) == len(IDS_PROFILES[profile_name]), f"Profile {profile_name} length mismatch"
+        print(f"  [OK] Profile {profile_name}: {len(v)}D vector produced")
+
 
     print("\n--- Testing Cat 3.1 ChallengeFrame ---")
     ecu_id     = 0x20
