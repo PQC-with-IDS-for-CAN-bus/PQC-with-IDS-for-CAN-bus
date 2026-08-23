@@ -230,8 +230,27 @@ class TestGatewayIDSExtractor(unittest.TestCase):
         # Fresh session 2 starting at counter 0 -> PASS
         self.assertTrue(self.extractor.check_monotonic_counter_gate(ecu_id, counter=0))
 
+    def test_14d_physical_kinematics_profile(self):
+        extractor_14d = GatewayIDSExtractor(profile="14D_PHYSICAL_KINEMATICS_LOO")
+        self.assertEqual(extractor_14d.num_features, 14)
+        
+        hdr = ProtectedRuntimeFrame.pack_unencrypted_header(0x10, 0x01, counter=100)
+        payload = ProtectedRuntimeFrame.pack_telemetry_payload(
+            speed=60.0, rpm=2000.0, steering_angle=10.0, brake_pressure=0.0,
+            throttle_pos=25.0, long_accel=0.5, lat_accel=0.1,
+            wheel_speed_fl=600, wheel_speed_fr=600, engine_temp=90, gear_status=3, dtc_flags=0
+        )
+        frame = hdr + payload + (b"\x00" * 16)
+        vec = extractor_14d.extract_features(frame, payload, is_tag_valid=True)
+        self.assertEqual(len(vec), 14)
+        self.assertEqual(vec[0], 60.0)    # speed
+        self.assertEqual(vec[1], 2000.0)  # rpm
+        self.assertEqual(vec[8], 90.0)    # coolant
+        self.assertAlmostEqual(vec[9], 0.0) # loo_wheel_fl
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

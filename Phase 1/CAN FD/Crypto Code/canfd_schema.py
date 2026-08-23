@@ -585,6 +585,22 @@ IDS_PROFILES: Dict[str, tuple] = {
                              #       injection — exactly what the autoencoder
                              #       learns to reconstruct as zero.
     ),
+    "14D_PHYSICAL_KINEMATICS_LOO": (
+        "speed",             # f1  : Vehicle Ground Speed (km/h)
+        "rpm",               # f2  : Engine RPM
+        "steering",          # f3  : Steering Angle (deg)
+        "brake",             # f4  : Brake Pressure (kPa)
+        "wheel_fl",          # f5  : Wheel Speed Front Left (km/h)
+        "wheel_fr",          # f6  : Wheel Speed Front Right (km/h)
+        "wheel_rl",          # f7  : Wheel Speed Rear Left (km/h)
+        "wheel_rr",          # f8  : Wheel Speed Rear Right (km/h)
+        "coolant",           # f9  : Engine Coolant Temp (deg C)
+        "loo_wheel_fl",      # f10 : Leave-One-Out FL Discrepancy (|w_FL - mean(w_FR, w_RL, w_RR)|)
+        "loo_wheel_fr",      # f11 : Leave-One-Out FR Discrepancy (|w_FR - mean(w_FL, w_RL, w_RR)|)
+        "loo_wheel_rl",      # f12 : Leave-One-Out RL Discrepancy (|w_RL - mean(w_FL, w_FR, w_RR)|)
+        "loo_wheel_rr",      # f13 : Leave-One-Out RR Discrepancy (|w_RR - mean(w_FL, w_FR, w_RL)|)
+        "speed_wheel_delta", # f14 : Longitudinal Vehicle Speed vs 4-Wheel Mean Delta
+    ),
     "18D_FULL_FRAME": (
         "frame_density",     # f1  : trailing causal frame-rate (fps, W=20)
         "counter_gap",       # f2  : monotonic counter jump
@@ -609,7 +625,7 @@ IDS_PROFILES: Dict[str, tuple] = {
 
 # Active default profile used by GatewayIDSExtractor if not specified.
 # Defaults to '12D_LEGACY' for 100% backward compatibility with Phase 1 unit tests.
-# Phase 2 ML-IDS instantiates GatewayIDSExtractor(profile="12D_ENHANCED") or "18D_FULL_FRAME".
+# Phase 2 ML-IDS instantiates GatewayIDSExtractor(profile="14D_PHYSICAL_KINEMATICS_LOO").
 ACTIVE_IDS_PROFILE: str = "12D_LEGACY"
 
 
@@ -825,6 +841,17 @@ class GatewayIDSExtractor:
         wheel_fl_ema_dev = wheel_fl - ema_state["wheel_fl"]
         coolant_ema_dev  = coolant  - ema_state["coolant"]
 
+        # ── 14D Physical Kinematics & LOO Wheel Delta Calculations ────────
+        # 4-wheel representation (in 40B payload FL/FR are explicit; RL/RR track FL/FR if not separate)
+        wheel_rl = wheel_fl
+        wheel_rr = wheel_fr
+        loo_fl = abs(wheel_fl - (wheel_fr + wheel_rl + wheel_rr) / 3.0)
+        loo_fr = abs(wheel_fr - (wheel_fl + wheel_rl + wheel_rr) / 3.0)
+        loo_rl = abs(wheel_rl - (wheel_fl + wheel_fr + wheel_rr) / 3.0)
+        loo_rr = abs(wheel_rr - (wheel_fl + wheel_fr + wheel_rl) / 3.0)
+        mean_wheels = (wheel_fl + wheel_fr + wheel_rl + wheel_rr) / 4.0
+        speed_wheel_delta = abs(speed - mean_wheels)
+
         # ── Profile-Driven Feature Assembly ──────────────────────────────
         _slot_map = {
             # Timing / bus
@@ -846,6 +873,8 @@ class GatewayIDSExtractor:
             "lat_accel":         lat_accel,
             "wheel_fl":          wheel_fl,
             "wheel_fr":          wheel_fr,
+            "wheel_rl":          wheel_rl,
+            "wheel_rr":          wheel_rr,
             "coolant":           coolant,
             "gear":              gear,
             "dtc_flags":         dtc_bits,
@@ -854,6 +883,12 @@ class GatewayIDSExtractor:
             "steering_ema_dev":  steering_ema_dev,
             "wheel_fl_ema_dev":  wheel_fl_ema_dev,
             "coolant_ema_dev":   coolant_ema_dev,
+            # Physical Kinematics & LOO Deltas (14D_PHYSICAL_KINEMATICS_LOO slots)
+            "loo_wheel_fl":      loo_fl,
+            "loo_wheel_fr":      loo_fr,
+            "loo_wheel_rl":      loo_rl,
+            "loo_wheel_rr":      loo_rr,
+            "speed_wheel_delta": speed_wheel_delta,
         }
 
         return [_slot_map[name] for name in self.feature_names]
