@@ -1,0 +1,76 @@
+{
+  "evaluation_type": "REAL_ROAD_CAN_TELEMETRY_EVALUATION",
+  "dataset": "Real ORNL Automotive Dataset (ROAD)",
+  "scenarios_evaluated": [
+    {
+      "scenario": "Speedometer Spoofing (Trial 1)",
+      "windows_tested": 5000,
+      "pytorch_roc_auc": 1.0,
+      "onnx_fp32_roc_auc": 1.0,
+      "onnx_int8_roc_auc": 1.0,
+      "fp32_decision_flips": 0,
+      "int8_decision_flips": 0,
+      "max_pointwise_diff_fp32": "6.85e-07",
+      "max_pointwise_diff_int8": "1.84e-02"
+    },
+    {
+      "scenario": "Wheel Speed Spoofing (Trial 1)",
+      "windows_tested": 5000,
+      "pytorch_roc_auc": 1.0,
+      "onnx_fp32_roc_auc": 1.0,
+      "onnx_int8_roc_auc": 1.0,
+      "fp32_decision_flips": 0,
+      "int8_decision_flips": 1,
+      "max_pointwise_diff_fp32": "7.75e-07",
+      "max_pointwise_diff_int8": "3.13e-02"
+    },
+    {
+      "scenario": "Coolant Temp Spoofing (Trial 1)",
+      "windows_tested": 5000,
+      "pytorch_roc_auc": 1.0,
+      "onnx_fp32_roc_auc": 1.0,
+      "onnx_int8_roc_auc": 1.0,
+      "fp32_decision_flips": 0,
+      "int8_decision_flips": 0,
+      "max_pointwise_diff_fp32": "4.77e-07",
+      "max_pointwise_diff_int8": "2.19e-02"
+    },
+    {
+      "scenario": "Clean Highway Cruising (Nominal)",
+      "windows_tested": 5000,
+      "pytorch_roc_auc": 1.0,
+      "onnx_fp32_roc_auc": 1.0,
+      "onnx_int8_roc_auc": 1.0,
+      "fp32_decision_flips": 0,
+      "int8_decision_flips": 0,
+      "max_pointwise_diff_fp32": "5.96e-07",
+      "max_pointwise_diff_int8": "1.54e-02"
+    }
+  ],
+  "latency_profiling_single_window_batch_1": [
+    {
+      "runtime": "PyTorch CPU (Eager FP32)",
+      "dev_mean_ms": 1.484,
+      "dev_p95_ms": 2.195,
+      "dev_p99_ms": 2.400,
+      "simulated_rpi4_p99_ms": 12.791,
+      "deadline_status": "EXCEEDS_TARGET_ON_RPI4"
+    },
+    {
+      "runtime": "ONNX Runtime FP32 (Golden Reference)",
+      "dev_mean_ms": 0.159,
+      "dev_p95_ms": 0.201,
+      "dev_p99_ms": 0.268,
+      "simulated_rpi4_p99_ms": 1.428,
+      "deadline_status": "PASS_GOLDEN (< 2.0 ms target, < 10.0 ms deadline)"
+    },
+    {
+      "runtime": "ONNX Runtime Dynamic INT8 (Optimization Candidate)",
+      "dev_mean_ms": 0.198,
+      "dev_p95_ms": 0.238,
+      "dev_p99_ms": 0.357,
+      "simulated_rpi4_p99_ms": 1.901,
+      "deadline_status": "PASS_ABLATION (< 2.0 ms target, < 10.0 ms deadline)"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "architecture": "14D_PHYSICAL_KINEMATICS_LSTM_AUTOENCODER",
+  "fp32_size_kb": 50.44,
+  "int8_size_kb": 72.86,
+  "compression_ratio_percent": -44.47,
+  "pytorch_latency_ms": 1.704,
+  "onnx_fp32_latency_ms": 0.269,
+  "onnx_int8_latency_ms": 0.384,
+  "pointwise_diff_fp32": 4.76837158203125e-07,
+  "pointwise_diff_int8": 0.1706451177597046
+}

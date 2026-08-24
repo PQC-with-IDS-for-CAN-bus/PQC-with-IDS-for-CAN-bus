@@ -1,0 +1,4 @@
+Physical_Attack_Scenario,ROC_AUC,Raw_Recall,Raw_FPR,Raw_F1,Filtered_Recall,Filtered_FPR,Filtered_F1,Status
+Speedometer Spoofing,0.9995,100.00%,97.85%,0.6939,100.00%,97.775%,0.694,PASS
+Correlated Wheel Speed,0.9999,100.00%,100.00%,0.8534,100.00%,99.539%,0.854,PASS
+Coolant Temp Spoofing,0.9999,100.00%,0.46%,0.9885,95.35%,1.382%,0.9425,PASS

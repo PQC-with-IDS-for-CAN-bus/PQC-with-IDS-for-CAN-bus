@@ -1,0 +1,7 @@
+Evaluated_Model,Silo_1_Test_MSE,Silo_2_Test_MSE,Silo_3_Test_MSE,Silo_4_Test_MSE,Silo_5_Test_MSE,Final_Untouched_Fleet_MSE
+Local Model 1 (Highway),0.02904,0.00716,0.082182,0.011357,0.007591,0.00271
+Local Model 2 (Street),0.052485,0.000235,0.137995,0.004076,9.6e-05,0.007358
+Local Model 3 (Basic Dyno),0.036497,0.078535,0.01614,0.076595,0.079736,0.040995
+Local Model 4 (Stress Dyno),0.052663,0.000426,0.136721,0.002629,0.000174,0.00736
+Local Model 5 (Extended Dyno),0.052431,0.000247,0.137487,0.003625,7.8e-05,0.007256
+Global Federated Model (10 Rds FedAvg),0.041134,0.000814,0.064912,0.003223,0.00074,0.003948

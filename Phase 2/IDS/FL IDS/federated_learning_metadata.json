@@ -1,0 +1,34 @@
+{
+  "deliverable": "Deliverable 4: Multi-Silo Federated Learning Simulation",
+  "model_architecture": "14D Physical Kinematics LSTM-Autoencoder",
+  "aggregation_strategy": "FedAvg (Weighted Sample Consensus)",
+  "communication_rounds": 10,
+  "local_epochs_per_round": 2,
+  "batch_size": 2048,
+  "learning_rate": 0.001,
+  "framework": "Flower (flwr.client.NumPyClient with Explicit Server FedAvg)",
+  "num_clients": 5,
+  "client_silos": {
+    "Silo 1": "Highway Long-Distance & Commute Silo (ambient_highway_street_driving_long [0 to 100k])",
+    "Silo 2": "City Street, Traffic & Turning Silo (ambient_highway_street_driving_long [650k to 750k])",
+    "Silo 3": "Dynamometer Basic Drive & Powertrain Silo (ambient_dyno_drive_basic_long [130k to 230k])",
+    "Silo 4": "Full-Range Signal & Bit-Exercising Silo (ambient_dyno_exercise_all_bits [0 to 100k])",
+    "Silo 5": "Extended Operations & Accessories Silo (ambient_dyno_drive_extended_long [50k to 150k])"
+  },
+  "dataset_separation": {
+    "dataset_a": "5 Heterogeneous Silos (80k train / 20k local in-domain test per silo)",
+    "dataset_b": "Round-by-Round Validation Suite (basic_short 40k + extended_short 40k)",
+    "dataset_c1": "Clean Baseline Calibration Suite (benign_anomaly 40k)",
+    "dataset_c2": "Strictly Held-Out Unseen Reverse-Domain Partition (reverse 30k)"
+  },
+  "v30_baseline_provenance": "100% Mathematically Disjoint & Programmatically Asserted",
+  "saved_artifacts": [
+    "can_ids_lstm_physical_fl.ipynb",
+    "fl_cross_silo_generalization_matrix.csv",
+    "fl_attack_benchmark_results.csv",
+    "federated_learning_convergence_curves.png",
+    "lstm_physical_federated.pth",
+    "lstm_physical_federated.onnx",
+    "lstm_physical_federated_dynamic_int8.onnx"
+  ]
+}
