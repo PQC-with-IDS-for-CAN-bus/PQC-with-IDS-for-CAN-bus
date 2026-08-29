@@ -7,6 +7,7 @@ https://ascon.iaik.tugraz.at/
 from __future__ import annotations
 
 from typing import Literal, TypeAlias, Iterable
+import hmac
 
 BytesLike: TypeAlias = bytes|bytearray|memoryview
 
@@ -223,7 +224,7 @@ def ascon_decrypt(key: BytesLike, nonce: BytesLike, associateddata: BytesLike, c
     ascon_process_associated_data(S, b, rate, associateddata)
     plaintext = ascon_process_ciphertext(S, b, rate, ciphertext[:-16])
     tag = ascon_finalize(S, rate, a, key)
-    if tag == ciphertext[-16:]:
+    if hmac.compare_digest(tag, ciphertext[-16:]):
         return plaintext
     else:
         return None

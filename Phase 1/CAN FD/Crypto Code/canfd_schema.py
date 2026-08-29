@@ -842,13 +842,23 @@ class GatewayIDSExtractor:
         coolant_ema_dev  = coolant  - ema_state["coolant"]
 
         # ── 14D Physical Kinematics & LOO Wheel Delta Calculations ────────
-        # 4-wheel representation (in 40B payload FL/FR are explicit; RL/RR track FL/FR if not separate)
+        # 4-wheel representation (in 40B payload FL/FR are explicit; RL/RR proxy FL/FR)
         wheel_rl = wheel_fl
         wheel_rr = wheel_fr
-        loo_fl = abs(wheel_fl - (wheel_fr + wheel_rl + wheel_rr) / 3.0)
-        loo_fr = abs(wheel_fr - (wheel_fl + wheel_rl + wheel_rr) / 3.0)
-        loo_rl = abs(wheel_rl - (wheel_fl + wheel_fr + wheel_rr) / 3.0)
-        loo_rr = abs(wheel_rr - (wheel_fl + wheel_fr + wheel_rl) / 3.0)
+
+        # NOTE: LOO uses MEDIAN (not mean) to match the training pipeline in
+        # evaluate_real_can_telemetry.py. Median is more robust to the single-wheel
+        # spoof case: if one wheel is spoofed, mean shifts slightly but median is
+        # unaffected by the outlier, making the LOO deviation sharper and more
+        # discriminative. Using mean here previously caused a feature mismatch
+        # between inference and training — fixed 2026-08-29.
+        def _median3(a, b, c):
+            return sorted([a, b, c])[1]
+
+        loo_fl = abs(wheel_fl - _median3(wheel_fr, wheel_rl, wheel_rr))
+        loo_fr = abs(wheel_fr - _median3(wheel_fl, wheel_rl, wheel_rr))
+        loo_rl = abs(wheel_rl - _median3(wheel_fl, wheel_fr, wheel_rr))
+        loo_rr = abs(wheel_rr - _median3(wheel_fl, wheel_fr, wheel_rl))
         mean_wheels = (wheel_fl + wheel_fr + wheel_rl + wheel_rr) / 4.0
         speed_wheel_delta = abs(speed - mean_wheels)
 
