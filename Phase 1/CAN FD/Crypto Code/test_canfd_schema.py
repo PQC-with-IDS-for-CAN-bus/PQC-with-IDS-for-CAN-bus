@@ -248,6 +248,19 @@ class TestGatewayIDSExtractor(unittest.TestCase):
         self.assertEqual(vec[8], 90.0)    # coolant
         self.assertAlmostEqual(vec[9], 0.0) # loo_wheel_fl
 
+        # Asymmetric test fixture: FL=650 (raw), FR=600 (raw)
+        # Proxied: FL=650.0, FR=600.0, RL=650.0, RR=600.0
+        # Median of {FR, RL, RR} = Median(600.0, 650.0, 600.0) = 600.0
+        # LOO_FL = |650.0 - 600.0| = 50.0
+        # (The legacy mean formula would have incorrectly computed |650.0 - 616.67| = 33.33)
+        payload_asym = ProtectedRuntimeFrame.pack_telemetry_payload(
+            speed=60.0, rpm=2000.0, steering_angle=10.0, brake_pressure=0.0,
+            throttle_pos=25.0, long_accel=0.5, lat_accel=0.1,
+            wheel_speed_fl=650, wheel_speed_fr=600, engine_temp=90, gear_status=3, dtc_flags=0
+        )
+        vec_asym = extractor_14d.extract_features(frame, payload_asym, is_tag_valid=True)
+        self.assertAlmostEqual(vec_asym[9], 50.0, places=2)  # loo_wheel_fl under median (50.0 vs 33.33)
+
 
 if __name__ == "__main__":
     unittest.main()
