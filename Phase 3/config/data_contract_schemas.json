@@ -1,0 +1,870 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase3_data_contracts_v1.0",
+  "title": "Phase 3 M3.4 Data Contract Schemas (Verified & Audited)",
+  "description": "Synthesized from 3 independent audits: (1) Blind Systems Design Auditor — first-principles PMU, nanosecond precision, ISO 26262 failure taxonomy; (2) Repo Ground-Truth Auditor — exact codebase function names, CAN IDs, and frame structures from canfd_schema.py, crypto_engine.py, onnx_inference.py; (3) IEEE/ASAM Browser Auditor — ASAM MDF4, Vector BLF, ACM TECS artifact standards, PQM4 benchmarking norms.",
+  "version": "1.0",
+  "generated_date": "2026-09-04",
+  "audit_sources": [
+    "Blind Systems Design Auditor (First-Principles PMU & Fault Taxonomy)",
+    "Repo Ground-Truth Contract Auditor (canfd_schema.py, crypto_engine.py, onnx_inference.py, Phase 2 Red Team)",
+    "IEEE/ASAM Browser Auditor (ASAM MDF4 v4.2, Vector BLF, ACM TECS, PQM4, ISO 26262-5 Annex D)"
+  ],
+
+  "contracts": {
+
+    "perf_stat_summary": {
+      "filename": "perf_stat_summary.csv",
+      "purpose": "Microarchitectural & OS-level computational resource profiling for cryptographic verification (ML-DSA, Ascon, Kyber) and ML IDS inference (ONNX LSTM) inside Dockerized ECU environments.",
+      "standards_compliance": [
+        "ACM TECS Artifact Evaluation Guidelines (raw counters + derived ratios)",
+        "PQM4 Embedded Cryptography Benchmarking (IACR 2019/844)",
+        "IEEE Micro Microarchitectural Profiling Reporting Norms"
+      ],
+      "minimum_trials": 1000,
+      "columns": {
+        "benchmark_id": {
+          "type": "string",
+          "description": "Unique benchmark trial identifier",
+          "format": "BM_NNN",
+          "validation": "^BM_[0-9]{3,6}$",
+          "source": "IEEE/ASAM Auditor — standard benchmark ID prefix",
+          "nullable": false
+        },
+        "timestamp_utc": {
+          "type": "string",
+          "description": "ISO 8601 UTC timestamp of benchmark execution",
+          "format": "ISO 8601",
+          "validation": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "source": "Blind Auditor — audit trail synchronization",
+          "nullable": false
+        },
+        "ecu_id": {
+          "type": "string",
+          "description": "ECU role and trust boundary within the CISG architecture",
+          "enum": ["ECU_POWERTRAIN", "ECU_CHASSIS", "ECU_BODY", "ECU_INFOTAINMENT", "GATEWAY_ROUTER"],
+          "source": "Repo Auditor — verified from canfd_schema.py domain segments and handshake_simulation.py node IDs (0x10, 0x20, 0xFF)",
+          "nullable": false
+        },
+        "container_id": {
+          "type": "string",
+          "description": "Docker container 12-char hex identifier for execution environment tracking",
+          "validation": "^[0-9a-f]{12}$",
+          "source": "Blind Auditor — Docker virtualization provenance",
+          "nullable": false
+        },
+        "cpu_core_affinity": {
+          "type": "uint16",
+          "unit": "core_index",
+          "description": "CPU core pinned via taskset/cpuset-cpus to prevent cache invalidation from core migration",
+          "validation": {"min": 0, "max": 128},
+          "source": "Blind Auditor — big.LITTLE asymmetry auditing; IEEE/ASAM Auditor — cpu_migrations must be 0 when pinned",
+          "nullable": false
+        },
+        "target_arch": {
+          "type": "string",
+          "description": "Target CPU architecture and microarchitecture for reproducibility",
+          "enum": ["arm64_cortex_a72", "arm64_cortex_a53", "x86_64_zen4", "x86_64_icelake"],
+          "source": "IEEE/ASAM Auditor — PQM4/ACM TECS artifact specification",
+          "nullable": false
+        },
+        "task_name": {
+          "type": "string",
+          "description": "Canonical string identifier for the profiled cryptographic or ML workload, matched exactly to codebase function names",
+          "enum": [
+            "puf_secret_reconstruction",
+            "puf_hash_derivation",
+            "hkdf_bootstrap_key_derivation",
+            "mldsa_keypair_generation",
+            "mldsa_sign_attestation",
+            "mldsa_verify_attestation",
+            "cat2_wrap_and_fragment",
+            "cat2_reassemble_and_unwrap",
+            "cat31_challenge_issue",
+            "cat31_challenge_parse",
+            "cat33_key_delivery_wrap",
+            "cat33_key_delivery_unwrap",
+            "cat1_telemetry_pack",
+            "cat1_telemetry_unpack",
+            "ascon_aead128_encrypt",
+            "ascon_aead128_decrypt",
+            "session_generate_random_challenge",
+            "session_generate_session_key",
+            "session_generate_nonce",
+            "tier1_rate_limiter_check",
+            "tier1_monotonic_counter_gate",
+            "tier1_ascon_tag_verification",
+            "tier1_rekey_state_reset",
+            "tier15_discrete_invariant_eval",
+            "gateway_14d_feature_extraction",
+            "tier2_sliding_window_preprocess",
+            "tier2_onnx_int8_inference",
+            "tier2_onnx_fp32_inference",
+            "tier2_pytorch_fp32_inference",
+            "tier2_subsystem_threshold_eval",
+            "tier2_causal_persistence_filter"
+          ],
+          "source": "Repo Auditor — mapped line-by-line to crypto_engine.py (Lines 60-490), canfd_schema.py (Lines 23-905), onnx_inference.py (Lines 111-315), wire_threat_injector.py (Lines 48-80), invariant_threat_injector.py (Lines 43-83)",
+          "nullable": false
+        },
+        "cache_state": {
+          "type": "string",
+          "description": "Cold-start (first run after cache flush) vs warm (steady-state operational) cache behavior",
+          "enum": ["COLD", "WARM"],
+          "source": "Blind Auditor — mixing cold/warm runs corrupts variance analysis",
+          "nullable": false
+        },
+        "num_trials": {
+          "type": "uint32",
+          "description": "Number of independent measurement repetitions for statistical confidence",
+          "validation": {"min": 100},
+          "source": "IEEE/ASAM Auditor — ACM artifact guidelines require N >= 1000 trials",
+          "nullable": false
+        },
+        "execution_wall_time_ns": {
+          "type": "uint64",
+          "unit": "nanoseconds",
+          "description": "Wall-clock execution duration in integer nanoseconds. Microsecond resolution introduces 1000x quantization error for sub-us symmetric primitives like Ascon block processing.",
+          "validation": {"min": 1},
+          "source": "Blind Auditor — corrected from proposed 'execution_wall_time_us'; at 2 GHz, 1 cycle = 0.5 ns",
+          "nullable": false
+        },
+        "task_clock_ns": {
+          "type": "uint64",
+          "unit": "nanoseconds",
+          "description": "Actual CPU time scheduled to the benchmark process (excludes preemption idle time)",
+          "validation": {"min": 1},
+          "source": "Blind Auditor — needed to compute true CPU utilization = task_clock / (wall_clock * N_threads)",
+          "nullable": false
+        },
+        "cpu_cycles": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Hardware PMU unhalted core clock cycles elapsed. Canonical denominator for IPC.",
+          "validation": {"min": 1},
+          "source": "All 3 auditors — fundamental raw counter",
+          "nullable": false
+        },
+        "instructions": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Hardware retired instructions at pipeline commit stage. Canonical numerator for IPC.",
+          "validation": {"min": 1},
+          "source": "All 3 auditors — fundamental raw counter",
+          "nullable": false
+        },
+        "ipc": {
+          "type": "float64",
+          "unit": "ratio",
+          "description": "Derived Instructions Per Cycle = instructions / cpu_cycles",
+          "validation": {"min": 0.0, "max": 10.0},
+          "source": "IEEE/ASAM Auditor — ACM TECS standard derived metric, 4 decimal places",
+          "nullable": false
+        },
+        "cpi": {
+          "type": "float64",
+          "unit": "ratio",
+          "description": "Derived Cycles Per Instruction = cpu_cycles / instructions",
+          "validation": {"min": 0.1, "max": 100.0},
+          "source": "IEEE/ASAM Auditor — complementary to IPC for stall analysis",
+          "nullable": false
+        },
+        "branch_instructions": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Total conditional and unconditional branch instructions executed",
+          "validation": {"min": 0},
+          "source": "Blind Auditor & IEEE/ASAM Auditor — base denominator for branch prediction accuracy",
+          "nullable": false
+        },
+        "branch_misses": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Speculative branch mispredictions causing pipeline flushes. Vital for constant-time cryptographic verification (Spectre-type branch target injection, ML-DSA rejection sampling leakage).",
+          "validation": {"min": 0},
+          "source": "Blind Auditor — critical for PQC side-channel audit; IEEE/ASAM Auditor — PQM4 standard event",
+          "nullable": false
+        },
+        "branch_miss_rate_pct": {
+          "type": "float64",
+          "unit": "percentage",
+          "description": "Derived (branch_misses / branch_instructions) * 100.0",
+          "validation": {"min": 0.0, "max": 100.0},
+          "source": "IEEE/ASAM Auditor — 2 decimal places",
+          "nullable": false
+        },
+        "branch_mpki": {
+          "type": "float64",
+          "unit": "misses_per_kilo_instructions",
+          "description": "Derived (branch_misses / instructions) * 1000. Standard architectural efficiency metric.",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor — ACM TECS / IEEE Micro standard reporting unit",
+          "nullable": false
+        },
+        "l1_dcache_loads": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Raw L1 data cache load requests. Mandatory raw divisor for L1-D miss rate.",
+          "validation": {"min": 0},
+          "source": "Blind Auditor — corrected from proposed derived-only 'l1_dcache_miss_pct'; raw counter is canonical",
+          "nullable": false
+        },
+        "l1_dcache_load_misses": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Raw L1 data cache misses forcing L2/LLC lookups",
+          "validation": {"min": 0},
+          "source": "Blind Auditor & IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "l1_dcache_miss_rate_pct": {
+          "type": "float64",
+          "unit": "percentage",
+          "description": "Derived (l1_dcache_load_misses / l1_dcache_loads) * 100.0",
+          "validation": {"min": 0.0, "max": 100.0},
+          "source": "All 3 auditors",
+          "nullable": false
+        },
+        "l1_dcache_mpki": {
+          "type": "float64",
+          "unit": "misses_per_kilo_instructions",
+          "description": "Derived (l1_dcache_load_misses / instructions) * 1000",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor — standard L1-D efficiency metric",
+          "nullable": false
+        },
+        "l1_icache_load_misses": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Instruction cache fetch stalls. Critical for PQC algorithms (ML-DSA polynomial NTT) with large code footprints that exceed 16-32 KiB L1-I caches on ARM Cortex-M7/A53.",
+          "validation": {"min": 0},
+          "source": "Blind Auditor — L1-D alone cannot reveal instruction-fetch stalls from PQC code size",
+          "nullable": false
+        },
+        "llc_loads": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Total memory requests escaping L1/L2 caches to Last-Level Cache (cache-references)",
+          "validation": {"min": 0},
+          "source": "Blind Auditor & IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "llc_load_misses": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "DRAM memory bus transactions. Detects memory-bandwidth saturation under concurrent ONNX LSTM inference and crypto verification.",
+          "validation": {"min": 0},
+          "source": "Blind Auditor — L1 miss cannot distinguish 12-cycle L2 hit from 200-cycle DRAM fetch",
+          "nullable": false
+        },
+        "llc_miss_rate_pct": {
+          "type": "float64",
+          "unit": "percentage",
+          "description": "Derived (llc_load_misses / llc_loads) * 100.0",
+          "validation": {"min": 0.0, "max": 100.0},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "llc_mpki": {
+          "type": "float64",
+          "unit": "misses_per_kilo_instructions",
+          "description": "Derived (llc_load_misses / instructions) * 1000",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor — ACM TECS standard LLC efficiency metric",
+          "nullable": false
+        },
+        "page_faults_minor": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Virtual memory page allocations in RAM without disk I/O. Reflects ONNX Runtime tensor arena dynamic allocation overhead.",
+          "validation": {"min": 0},
+          "source": "Blind Auditor — quantifies memory allocation overhead during batch inference",
+          "nullable": false
+        },
+        "page_faults_major": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Disk paging events requiring swap I/O. MUST BE 0 in hard real-time automotive ECU evaluation. Non-zero values are fatal for ASIL-D compliance.",
+          "validation": {"min": 0, "max": 0, "asil_d_constraint": "MUST_BE_ZERO_IN_STEADY_STATE"},
+          "source": "Blind Auditor — defense committee will demand proof of zero major page faults",
+          "nullable": false
+        },
+        "context_switches_voluntary": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Thread yields due to I/O wait or sleep syscalls",
+          "validation": {"min": 0},
+          "source": "Blind Auditor & IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "context_switches_involuntary": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Linux CFS scheduler preemptions. Non-zero values inflate wall_time and depress IPC without reflecting true algorithmic cost.",
+          "validation": {"min": 0},
+          "source": "Blind Auditor — separates OS scheduling noise from crypto/ML runtime cost",
+          "nullable": false
+        },
+        "cpu_migrations": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Task hops across CPU cores causing full cache invalidation penalty. Must be 0 when cpu_core_affinity is pinned.",
+          "validation": {"min": 0},
+          "source": "IEEE/ASAM Auditor — PQM4 requires taskset -c pinning",
+          "nullable": false
+        },
+        "peak_rss_bytes": {
+          "type": "uint64",
+          "unit": "bytes",
+          "description": "Maximum Resident Set Size (VmHWM from /proc/[pid]/status or ru_maxrss via getrusage). Expressed in bytes to avoid SI/IEC kibibyte ambiguity.",
+          "validation": {"min": 1},
+          "source": "Blind Auditor — corrected from proposed 'resident_set_size_kb'; bytes eliminates KB/KiB ambiguity",
+          "nullable": false
+        },
+        "stack_peak_bytes": {
+          "type": "uint64",
+          "unit": "bytes",
+          "description": "Maximum runtime stack consumption measured via stack canary high-water marks. Standard in PQM4 embedded benchmarks.",
+          "validation": {"min": 0},
+          "source": "IEEE/ASAM Auditor — PQM4 standard stack profiling metric",
+          "nullable": false
+        },
+        "pmu_scaling_percentage": {
+          "type": "float64",
+          "unit": "percentage",
+          "description": "PMU counter multiplexing check (time_enabled / time_running * 100). 100.0 = no multiplexing (clean measurement). ARM Cortex-A53 has only 4-6 PMU registers, so runs with <95% scaling must split into multi-pass profiling.",
+          "validation": {"min": 0.0, "max": 100.0},
+          "source": "Blind Auditor — leaves PMU overcommit undetected without this field",
+          "nullable": false
+        }
+      },
+      "statistical_aggregation_note": "Per IEEE/ASAM Auditor: When num_trials >= 1000, also report mean_cycles, std_cycles, median_cycles, ci95_cycles_low, ci95_cycles_high alongside single-run raw counts for statistical rigor."
+    },
+
+    "tcpdump_latency_summary": {
+      "filename": "tcpdump_latency_summary.csv",
+      "purpose": "Packet-level wire transit, queuing latency, and jitter tracking across virtual/hardware CAN-FD interfaces, compliant with ASAM MDF4 v4.2 bus logging conventions.",
+      "standards_compliance": [
+        "ASAM MDF4 v4.1/v4.2 (ASAM MCD-2 MC) Master Channel & CAN_DataFrame ChannelGroup",
+        "Vector Informatik BLF CAN_FD_MESSAGE struct (uint64 mTime nanoseconds)",
+        "Linux SocketCAN SO_TIMESTAMPNS (struct timespec: tv_sec + tv_nsec)",
+        "ORNL ROAD Dataset (PLoS ONE 2024, DOI: 10.1371/journal.pone.0296879)",
+        "HCRL CAN-FD Intrusion Dataset (IEEE DataPort DOI: 10.21227/gpxq-3551)"
+      ],
+      "columns": {
+        "session_id": {
+          "type": "string",
+          "description": "Transport session identifier linking all frames in one attestation transfer",
+          "validation": "^SESS_[A-Z0-9_]+_[0-9]{3,6}$",
+          "example": "SESS_60_4_001",
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "frame_idx": {
+          "type": "uint16",
+          "unit": "index",
+          "description": "0-indexed position within the current burst (0 to 40 for 60/4, 0 to 38 for ISO-TP CF, 0 to 11 for Castiglione native)",
+          "validation": {"min": 0, "max": 255},
+          "source": "Repo Auditor — verified from canfd_schema.py:319,341 (indices 0 to 40)",
+          "nullable": false
+        },
+        "total_frames_expected": {
+          "type": "uint16",
+          "unit": "count",
+          "description": "Expected burst frame count for the protocol (41 for 60/4, 39 for ISO-TP, 12 for Castiglione native, 39 for Castiglione scaled)",
+          "validation": {"min": 1, "max": 255},
+          "source": "Blind Auditor — needed to validate counter completion",
+          "nullable": false
+        },
+        "bus_channel": {
+          "type": "uint8",
+          "unit": "channel_index",
+          "description": "Physical or virtual CAN bus interface (1-indexed per ASAM MDF4 CGBLOCK convention)",
+          "validation": {"min": 1, "max": 16},
+          "source": "IEEE/ASAM Auditor — ASAM MDF4 CAN_DataFrame.BusChannel",
+          "nullable": false
+        },
+        "protocol_name": {
+          "type": "string",
+          "description": "Transport protocol under benchmark",
+          "enum": ["SIXTY_FOUR_BLOCK", "ISO_TP_15765_2", "CASTIGLIONE_NATIVE", "CASTIGLIONE_SCALED", "RUNTIME_TELEMETRY"],
+          "source": "All 3 auditors",
+          "nullable": false
+        },
+        "frame_role": {
+          "type": "string",
+          "description": "Functional role of the frame within the transport protocol",
+          "enum": [
+            "DATA",
+            "FIRST_FRAME",
+            "CONSECUTIVE_FRAME",
+            "FLOW_CONTROL",
+            "SELECTIVE_NACK",
+            "FULL_RESTART_NACK",
+            "TELEMETRY_PROTECTED",
+            "TELEMETRY_PLAINTEXT",
+            "CHALLENGE_FRAME",
+            "KEY_DELIVERY_FRAME"
+          ],
+          "source": "Blind Auditor — frame_type enum; Repo Auditor — Category 1/2/3 frame types from canfd_schema.py",
+          "nullable": false
+        },
+        "retransmit_attempt_idx": {
+          "type": "uint8",
+          "unit": "index",
+          "description": "Identifies whether this frame is part of the initial burst (0) or a subsequent retry (1, 2, 3)",
+          "validation": {"min": 0, "max": 3},
+          "source": "Blind Auditor — disambiguates initial burst from retransmission rounds",
+          "nullable": false
+        },
+        "can_id_hex": {
+          "type": "string",
+          "description": "CAN Arbitration Identifier formatted with leading 0x prefix (3 hex digits for standard 11-bit, 8 hex digits for 29-bit extended)",
+          "validation": "^0x[0-9A-Fa-f]{3,8}$",
+          "verified_ids": {
+            "0x046": "Castiglione native capsule share (from Base Paper Table 2)",
+            "0x047": "Castiglione full restart NACK (from Base Paper Section 5.2)",
+            "0x0D0": "Powertrain telemetry (speed, RPM) — evaluate_real_can_telemetry.py:46-50",
+            "0x200": "ML-DSA-44 attestation block transfer — Gateway_Node/src/main.cpp:74",
+            "0x201": "Selective NACK recovery frame — Gateway_Node/src/main.cpp:150, protocol_fuzzer.py:252",
+            "0x354": "Chassis telemetry (steering, brake) — evaluate_real_can_telemetry.py:55-59",
+            "0x4E7": "Engine thermal (coolant temp) — evaluate_real_can_telemetry.py:70-72",
+            "0x6E0": "4-wheel speed telemetry — evaluate_real_can_telemetry.py:62-66"
+          },
+          "source": "Repo Auditor — cross-referenced across canfd_schema.py, main.cpp, onnx_inference.py; IEEE/ASAM Auditor — ASAM MDF4 + Vector ASC format requires 0x prefix",
+          "nullable": false
+        },
+        "ide_flag": {
+          "type": "uint8",
+          "description": "Identifier Extension flag: 0 = 11-bit standard CAN 2.0A, 1 = 29-bit extended CAN 2.0B",
+          "enum": [0, 1],
+          "source": "IEEE/ASAM Auditor — ASAM MDF4 CAN_DataFrame.IDE; ORNL ROAD dataset convention",
+          "nullable": false
+        },
+        "dlc": {
+          "type": "uint8",
+          "unit": "dlc_code",
+          "description": "CAN-FD Data Length Code (0–15). CRITICAL: In CAN-FD, DLC 9-15 map non-linearly to 12, 16, 20, 24, 32, 48, 64 bytes. Must be stored separately from payload_bytes.",
+          "validation": {"allowed": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]},
+          "source": "IEEE/ASAM Auditor — ISO 11898-1:2015 Clause 8.4.2.3; ASAM MDF4 separates DLC from DataLength",
+          "nullable": false
+        },
+        "payload_bytes": {
+          "type": "uint8",
+          "unit": "bytes",
+          "description": "Effective payload length in bytes (non-linear DLC mapping: DLC 10 = 16B for NACK, DLC 15 = 64B for data)",
+          "validation": {"allowed": [0, 8, 12, 16, 20, 24, 32, 48, 64]},
+          "source": "IEEE/ASAM Auditor — ASAM MDF4 CAN_DataFrame.DataLength; Repo Auditor — DLC 15 = 64B for data, DLC 10 = 16B for Cat 3.2 NACK",
+          "nullable": false
+        },
+        "payload_active_bytes": {
+          "type": "uint8",
+          "unit": "bytes",
+          "description": "Non-padded active transport payload bytes within the frame (e.g. 60 for 60/4 data frames, 36 for frame 40, 58 for ISO-TP FF, 63 for ISO-TP CF)",
+          "validation": {"min": 0, "max": 64},
+          "source": "Blind Auditor — disambiguates padding from active data; Repo Auditor — frame 40 carries 36B active + 24B zero padding",
+          "nullable": false
+        },
+        "brs_flag": {
+          "type": "uint8",
+          "description": "Bit Rate Switch flag: 1 = data phase transmitted at fast bitrate, 0 = flat nominal bitrate",
+          "enum": [0, 1],
+          "source": "IEEE/ASAM Auditor — Bosch CAN-FD Spec v1.0 & ISO 11898-1:2015; ASAM MDF4 Flags bitfield",
+          "nullable": false
+        },
+        "esi_flag": {
+          "type": "uint8",
+          "description": "Error State Indicator: 0 = Error Active node, 1 = Error Passive node",
+          "enum": [0, 1],
+          "source": "IEEE/ASAM Auditor — ISO 11898-1:2015 ESI bit",
+          "nullable": false
+        },
+        "timestamp_epoch_ns": {
+          "type": "uint64",
+          "unit": "nanoseconds",
+          "description": "Absolute Unix epoch timestamp at kernel network device driver ingress/egress in integer nanoseconds. uint64 range valid until year 2554. Millisecond representation REJECTED: rounds vcan0 transit times (12-45 us) to 0 ms.",
+          "validation": {"min": 1700000000000000000},
+          "source": "Blind Auditor — mathematical proof that float32 epoch_ms has ±131 second error; IEEE/ASAM Auditor — ASAM MDF4 Master Channel & SocketCAN SO_TIMESTAMPNS; Vector BLF mTime is uint64 ns",
+          "nullable": false
+        },
+        "timestamp_rel_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Elapsed time from first frame of session in microseconds (float64, 2 decimal places for tabular analysis)",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor — Vector ASC format uses relative time from session start; convenient for IFAT computation",
+          "nullable": false
+        },
+        "ifat_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Inter-Frame Arrival Time: delta_t = timestamp_rel_us[k] - timestamp_rel_us[k-1]. Universal timing-based IDS feature across IEEE TVT/TIFS literature.",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor — ORNL ROAD dataset & IEEE TVT IDS papers; Blind Auditor — detects CAN mailbox buffer overrun risk",
+          "nullable": true,
+          "nullable_reason": "Null for first frame of session (frame_idx = 0)"
+        },
+        "arrival_jitter_ns": {
+          "type": "int64",
+          "unit": "nanoseconds",
+          "description": "Signed deviation from expected pacing interval (rx_ifat - expected_gap). Positive = late, negative = early.",
+          "source": "Blind Auditor — validates ISO-TP ST_min pacing compliance",
+          "nullable": true,
+          "nullable_reason": "Null for first frame of session"
+        },
+        "nominal_baud": {
+          "type": "uint32",
+          "unit": "bits_per_second",
+          "description": "Arbitration phase nominal baud rate",
+          "validation": {"allowed": [250000, 500000, 1000000]},
+          "source": "IEEE/ASAM Auditor — ASAM MDF4 bus parameter; Repo Auditor — 500000 for production, 1000000 for Castiglione baseline",
+          "nullable": false
+        },
+        "data_baud": {
+          "type": "uint32",
+          "unit": "bits_per_second",
+          "description": "CAN-FD fast data phase baud rate (only active when brs_flag = 1)",
+          "validation": {"allowed": [1000000, 2000000, 5000000]},
+          "source": "IEEE/ASAM Auditor — ISO 11898-1:2015 dual bitrate",
+          "nullable": false
+        },
+        "frame_duration_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Physical on-wire transmission time: N_nom * tau_nom + N_dat * tau_dat (including bit-stuffing overhead)",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor — critical for bus utilization and schedulability validation",
+          "nullable": false
+        },
+        "interface_rx_drops": {
+          "type": "uint64",
+          "unit": "raw_count",
+          "description": "Kernel SocketCAN receive buffer drops (ENOBUFS) sampled from /sys/class/net/<iface>/statistics/rx_dropped",
+          "validation": {"min": 0},
+          "source": "Blind Auditor — 41 back-to-back CAN-FD frames can overflow txqueuelen on vcan0",
+          "nullable": false
+        }
+      }
+    },
+
+    "fault_recovery_runs": {
+      "filename": "fault_recovery_runs.csv",
+      "purpose": "Empirical tracking of fault-injection trials, recovery protocol state transitions, selective retransmission rounds, and ISO 26262 failure mode attribution across 3 transport protocols and 3 bitrate regimes.",
+      "standards_compliance": [
+        "ISO 26262-5:2018 Annex D (Hardware Fault Models)",
+        "ISO 26262-6:2018 Table 7 (Software Fault Detection & Reaction)",
+        "AUTOSAR Classic R23-11 E2E Protocol Specification (SWS EndToEndCommunicationProtection)",
+        "IEEE TDSC Fault Injection & Dependability Reporting Standards"
+      ],
+      "columns": {
+        "run_id": {
+          "type": "string",
+          "description": "Unique trial identifier (UUIDv4 or sequential integer)",
+          "validation": "^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-9]+)$",
+          "source": "Blind Auditor & IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "trial_idx": {
+          "type": "uint32",
+          "description": "Sequential trial index within a scenario sweep (0 to N_trials-1)",
+          "validation": {"min": 0},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "scenario_id": {
+          "type": "uint16",
+          "description": "Project-defined test scenario ID (1-5 for canonical scenarios, 0 for Monte Carlo sweeps)",
+          "validation": {"min": 0, "max": 99},
+          "source": "All 3 auditors — mapped to transport_simulation_config.json:102-133",
+          "nullable": false
+        },
+        "scenario_name": {
+          "type": "string",
+          "description": "Canonical human-readable scenario name",
+          "enum": [
+            "Clean Bus (Nominal)",
+            "Isolated Single Frame Drop",
+            "Late-Sequence Frame Drop",
+            "Inductive Relay Transient Spike",
+            "Alternator Commutation Burst",
+            "Monte Carlo Loss Sweep"
+          ],
+          "source": "Repo Auditor — matches compare_transport_protocols.py deterministic_scenarios",
+          "nullable": false
+        },
+        "protocol_name": {
+          "type": "string",
+          "description": "Transport protocol under evaluation",
+          "enum": ["SIXTY_FOUR_BLOCK", "ISO_TP_15765_2", "CASTIGLIONE_NATIVE", "CASTIGLIONE_SCALED"],
+          "source": "All 3 auditors",
+          "nullable": false
+        },
+        "bitrate_regime": {
+          "type": "string",
+          "description": "Physical bus speed configuration",
+          "enum": ["CASTIGLIONE_1MBPS", "PROD_CANFD_2MBPS", "HIGHPERF_CANFD_5MBPS"],
+          "source": "Blind Auditor & IEEE/ASAM Auditor — 3 regimes from transport_simulation_config.json",
+          "nullable": false
+        },
+        "nominal_baud": {
+          "type": "uint32",
+          "unit": "bits_per_second",
+          "validation": {"allowed": [500000, 1000000]},
+          "nullable": false
+        },
+        "data_baud": {
+          "type": "uint32",
+          "unit": "bits_per_second",
+          "validation": {"allowed": [1000000, 2000000, 5000000]},
+          "nullable": false
+        },
+        "fault_model": {
+          "type": "string",
+          "description": "Injected fault model classification per ISO 26262-5 Annex D",
+          "enum": [
+            "NOMINAL_CLEAN",
+            "SINGLE_FRAME_DROP",
+            "LATE_SEQUENCE_DROP",
+            "BURST_FRAME_DROP",
+            "GILBERT_ELLIOTT_BURST",
+            "BERNOULLI_RANDOM",
+            "PAYLOAD_BIT_FLIP",
+            "NACK_CONTROL_FRAME_DROP"
+          ],
+          "source": "Blind Auditor — includes NACK_CONTROL_FRAME_DROP to test recovery mechanism resilience; IEEE/ASAM Auditor — ISO 26262 failure model taxonomy",
+          "nullable": false
+        },
+        "injected_dropped_frame_indices": {
+          "type": "string",
+          "description": "Semicolon-delimited list of targeted frame indices (e.g. '14;15;16'), or 'NONE' for clean bus",
+          "validation": "^(NONE|[0-9]+(;[0-9]+)*)$",
+          "source": "Blind Auditor — corrected from ambiguous scalar count; IEEE/ASAM Auditor — spatial coordinates needed for burst pattern analysis",
+          "nullable": false
+        },
+        "burst_length": {
+          "type": "uint16",
+          "unit": "frames",
+          "description": "Number of consecutive dropped frames in the burst (0 for clean, 1 for single, 3/8 for bursts)",
+          "validation": {"min": 0, "max": 41},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "channel_loss_rate_p": {
+          "type": "float64",
+          "description": "Applied channel loss probability for Monte Carlo sweeps (0.00 for deterministic scenarios)",
+          "validation": {"min": 0.0, "max": 1.0},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "payload_corruption_injected": {
+          "type": "boolean",
+          "description": "Whether a bit-flip was injected into the payload to test Ascon-AEAD128 tag verification failure (separate from frame drop)",
+          "source": "Blind Auditor — distinguishes dropped frame from corrupted-but-received frame",
+          "nullable": false
+        },
+        "recovery_success": {
+          "type": "boolean",
+          "description": "High-level session completion flag (True = payload reassembled and cryptographically verified)",
+          "source": "All 3 auditors — retained as quick-filter boolean alongside detailed termination_status_code",
+          "nullable": false
+        },
+        "recovery_rounds": {
+          "type": "uint8",
+          "description": "Number of retransmission cycles executed (0 = clean first-pass, 1-3 for retry rounds)",
+          "validation": {"min": 0, "max": 3},
+          "source": "All 3 auditors",
+          "nullable": false
+        },
+        "retransmit_policy": {
+          "type": "string",
+          "description": "Recovery mechanism type used by the protocol under test",
+          "enum": ["selective_nack_bitmap", "full_sequence_abort", "full_sequence_restart"],
+          "source": "IEEE/ASAM Auditor — distinguishes ISO-TP abort vs Castiglione restart vs 60/4 bitmap",
+          "nullable": false
+        },
+        "nack_frames_issued_count": {
+          "type": "uint8",
+          "description": "Total NACK or Flow Control frames transmitted across all retry rounds",
+          "validation": {"min": 0, "max": 3},
+          "source": "Blind Auditor",
+          "nullable": false
+        },
+        "nack_bitmaps_issued_hex": {
+          "type": "string",
+          "description": "Semicolon-delimited hexadecimal 64-bit NACK bitmaps transmitted per round (e.g. '0x0000000000041000;0x0000000000040000'). Only applicable to SIXTY_FOUR_BLOCK protocol.",
+          "validation": "^(N_A|0x[0-9A-Fa-f]{16}(;0x[0-9A-Fa-f]{16})*)$",
+          "source": "Blind Auditor — captures per-round bitmap state; Repo Auditor — Cat 3.2 NACK frame is 16B with 8B bitmap (4B MISSING_BITMAP_0 + 4B MISSING_BITMAP_1)",
+          "nullable": false
+        },
+        "round_1_requested_frames": {
+          "type": "uint16",
+          "description": "Missing frames requested in Round 1 NACK",
+          "validation": {"min": 0, "max": 41},
+          "source": "Blind Auditor — multi-round disambiguation is critical for protocol recovery dynamics analysis",
+          "nullable": false
+        },
+        "round_1_recovered_frames": {
+          "type": "uint16",
+          "description": "Retransmitted frames successfully received in Round 1",
+          "validation": {"min": 0, "max": 41},
+          "source": "Blind Auditor",
+          "nullable": false
+        },
+        "round_2_requested_frames": {
+          "type": "uint16",
+          "validation": {"min": 0, "max": 41},
+          "nullable": false
+        },
+        "round_2_recovered_frames": {
+          "type": "uint16",
+          "validation": {"min": 0, "max": 41},
+          "nullable": false
+        },
+        "round_3_requested_frames": {
+          "type": "uint16",
+          "validation": {"min": 0, "max": 41},
+          "nullable": false
+        },
+        "round_3_recovered_frames": {
+          "type": "uint16",
+          "validation": {"min": 0, "max": 41},
+          "nullable": false
+        },
+        "initial_frames_sent": {
+          "type": "uint16",
+          "description": "Data frames transmitted in initial burst (41 for 60/4, 39 for ISO-TP, 12 for Castiglione native)",
+          "validation": {"min": 1, "max": 255},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "retransmitted_frames_count": {
+          "type": "uint16",
+          "description": "Total data frames resent across all retry rounds",
+          "validation": {"min": 0},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "control_frames_count": {
+          "type": "uint16",
+          "description": "Total control frames on wire (NACK + Flow Control + Restart NACK)",
+          "validation": {"min": 0},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "total_frames_on_wire": {
+          "type": "uint32",
+          "description": "Total frames put on wire (initial + retransmit + control)",
+          "validation": {"min": 1},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "total_wire_bytes": {
+          "type": "uint32",
+          "unit": "bytes",
+          "description": "Total physical bytes consumed on bus including frame overhead",
+          "validation": {"min": 1},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "goodput_efficiency_pct": {
+          "type": "float64",
+          "unit": "percentage",
+          "description": "Application goodput = (application_payload_bytes / total_wire_bytes) * 100.0",
+          "validation": {"min": 0.0, "max": 100.0},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "end_to_end_latency_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Total elapsed turnaround latency from Frame 0 Tx to complete payload assembly",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "nominal_clean_time_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Theoretical or empirical baseline duration under clean bus (0% loss)",
+          "validation": {"min": 0.0},
+          "source": "Blind Auditor — needed to compute recovery_overhead",
+          "nullable": false
+        },
+        "recovery_overhead_latency_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Pure empirical time cost of fault recovery = end_to_end_latency - nominal_clean_time",
+          "validation": {"min": 0.0},
+          "source": "Blind Auditor — scope-unambiguous recovery latency definition",
+          "nullable": false
+        },
+        "nack_turnaround_time_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Delay from NACK Tx to receipt of first retransmitted frame",
+          "validation": {"min": 0.0},
+          "source": "Blind Auditor — measures NACK protocol round-trip overhead",
+          "nullable": true,
+          "nullable_reason": "Null when no NACK was issued (clean bus or full-abort protocol)"
+        },
+        "retry_exhaustion_flag": {
+          "type": "boolean",
+          "description": "True if maximum retries (K_retry = 3) were exhausted without complete assembly",
+          "source": "IEEE/ASAM Auditor",
+          "nullable": false
+        },
+        "termination_status_code": {
+          "type": "string",
+          "description": "Root-cause failure classification per ISO 26262 audit tree. Replaces ambiguous binary success/fail with actionable diagnostic codes.",
+          "enum": [
+            "SUCCESS",
+            "ERR_RETRY_EXHAUSTION",
+            "ERR_TIMEOUT_NACK_WAIT",
+            "ERR_TIMEOUT_FLOW_CONTROL",
+            "ERR_CRYPTO_TAG_MISMATCH",
+            "ERR_CRYPTO_SIG_INVALID",
+            "ERR_HEADER_OUT_OF_RANGE",
+            "ERR_SOCKET_BUFFER_OVERFLOW",
+            "ERR_BUS_OFF"
+          ],
+          "source": "Blind Auditor — ISO 26262 failure taxonomy; IEEE/ASAM Auditor — iso26262_failure_classification field",
+          "nullable": false
+        },
+        "iso26262_failure_classification": {
+          "type": "string",
+          "description": "High-level ISO 26262 safety classification of the outcome",
+          "enum": [
+            "SAFE_TRANSMISSION",
+            "RECOVERED_FAULT",
+            "INFORMATION_LOSS_OMISSION",
+            "PROTOCOL_ABORT_TIMEOUT",
+            "CORRUPTED_FRAME_REJECTED"
+          ],
+          "source": "IEEE/ASAM Auditor — ISO 26262-5 Annex D canonical fault model taxonomy",
+          "nullable": false
+        },
+        "ftti_budget_us": {
+          "type": "float64",
+          "unit": "microseconds",
+          "description": "Fault Tolerant Time Interval budget from HARA (default 50000 us = 50 ms for ASIL-D boot attestation)",
+          "validation": {"min": 0.0},
+          "source": "IEEE/ASAM Auditor — ISO 26262-4 Clause 6.4.4 FTTI",
+          "nullable": false
+        },
+        "ftti_violation_flag": {
+          "type": "boolean",
+          "description": "True if end_to_end_latency exceeds ftti_budget (safety goal violation)",
+          "source": "IEEE/ASAM Auditor — critical ASIL-D acceptance criterion",
+          "nullable": false
+        },
+        "safety_state_achieved": {
+          "type": "string",
+          "description": "Final system safety state after fault handling",
+          "enum": ["OPERATIONAL", "SAFE_FALLBACK", "UNRECOVERED_HAZARD"],
+          "source": "IEEE/ASAM Auditor — ISO 26262 safe state taxonomy",
+          "nullable": false
+        }
+      }
+    }
+  }
+}
