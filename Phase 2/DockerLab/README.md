@@ -114,7 +114,7 @@ sequenceDiagram
     GW->>Bus: Cat 3.1 challenge and session ID (0x202)
     Bus->>ECU: Challenge
     Note over ECU,GW: Independently derive K_boot with HKDF-SHA256
-    Note over ECU: Hash actual ECU source; sign transcript with ML-DSA-44
+    Note over ECU: Hash actual ECU source and sign transcript with ML-DSA-44
     ECU->>Bus: Ascon-wrapped attestation, 41 frames (0x200)
     Bus->>GW: Frames except deliberately omitted indices
     loop Up to three recovery rounds when incomplete
