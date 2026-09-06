@@ -1,0 +1,2 @@
+cryptography==50.0.1
+dilithium-py==1.4.0

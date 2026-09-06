@@ -1,0 +1,282 @@
+"""Orchestrate real services and export only observed execution evidence."""
+import argparse
+import csv
+import hashlib
+import json
+import importlib.metadata
+import platform
+import struct
+from pathlib import Path
+import sys
+import time
+import urllib.request
+import uuid
+
+from common import ROOT, atomic
+sys.path.insert(0, str(ROOT / 'Phase 2/Simulation'))
+from contracts import columns, profile, validate
+
+CANONICAL = [
+    ('clean',1,'Clean Bus (Nominal)','NOMINAL_CLEAN',[]),
+    ('single',2,'Isolated Single Frame Drop','SINGLE_FRAME_DROP',[12]),
+    ('late',3,'Late-Sequence Frame Drop','LATE_SEQUENCE_DROP',[38]),
+    ('relay_spike',4,'Inductive Relay Transient Spike','BURST_FRAME_DROP',[14,15,16]),
+    ('alternator',5,'Alternator Commutation Burst','BURST_FRAME_DROP',list(range(20,28))),
+]
+
+
+def rpc(node, path='/health', data=None):
+    req = urllib.request.Request(f'http://{node}:8080{path}',
+        data=json.dumps(data).encode() if data is not None else None,
+        headers={'Content-Type':'application/json'})
+    with urllib.request.urlopen(req, timeout=5) as response:
+        return json.load(response)
+
+
+def await_ready():
+    deadline = time.monotonic()+90
+    for node in ['relay','gateway','ecu1','ecu2','ecu3','ecu4']:
+        while True:
+            try:
+                if rpc(node).get('ready'):
+                    break
+            except (OSError, ValueError):
+                pass
+            if time.monotonic()>deadline:
+                raise RuntimeError(f'{node} never became ready')
+            time.sleep(.2)
+
+
+def read_events():
+    events = []
+    for path in Path('/logs').glob('*/events.jsonl'):
+        for line in path.read_text().splitlines():
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue  # A concurrently written final line will be read next poll.
+    return sorted(events, key=lambda e:e['monotonic_ns'])
+
+
+def execute(domain, scenario, trial, seed):
+    mode, sid, name, fault, drops = scenario
+    run_id = str(uuid.uuid4())
+    config = dict(run_id=run_id, domain=domain, scenario=mode, drops=drops, seed=seed,
+                  frame_gap_ms=1, recovery_timeout_ms=50, ecu_wait_ms=500,
+                  ftti_us=500000, loss_rate=.2)
+    rpc('relay','/configure',config)
+    rpc(f'ecu{domain}','/prepare',config)
+    rpc('gateway','/run',config)
+    deadline = time.monotonic()+15
+    while True:
+        gw = rpc('gateway')['domains'][str(domain)]
+        ecu = rpc(f'ecu{domain}')
+        if gw['run_id']==run_id and not gw['busy'] and gw['result'] and not ecu['busy'] and ecu['result']:
+            break
+        if time.monotonic()>deadline:
+            raise RuntimeError(f'Run {run_id}: services did not finish; inspect node logs')
+        time.sleep(.05)
+    events = [e for e in read_events() if e.get('run_id')==run_id]
+    result = gw['result']
+    if result['status']=='EXECUTION_ERROR' or ecu['result']['status']=='EXECUTION_ERROR':
+        raise RuntimeError(f'Execution error: gateway={result}, ecu={ecu["result"]}')
+    data = [e for e in events if e['node']==f'ecu{domain}' and e['event']=='tx' and e.get('can_id')=='0x200']
+    if not data:
+        raise RuntimeError('No actual ECU transmissions recorded')
+    initial = [e for e in data if e['round']==0]
+    retransmits = len(data)-len(initial)
+    omitted = sorted(set(e['frame_idx'] for e in events if e['event']=='injected_drop' and e.get('can_id')=='0x200' and e['round']==0))
+    burst = current = 0
+    last = -2
+    for index in omitted:
+        current = current+1 if index==last+1 else 1
+        burst, last = max(burst,current), index
+    status = result['status']
+    origin = 'gateway'
+    if status=='ERR_RETRY_EXHAUSTION' and ecu['result']['status']=='ERR_TIMEOUT_NACK_WAIT' and ecu['result']['nack_rounds']==0:
+        # This is an observed sender timeout without any accepted NACK, not a
+        # failure code inferred from a scenario label. Keep both endpoint results.
+        status, origin = 'ERR_TIMEOUT_NACK_WAIT','ecu'
+    latency = (result['authenticated_ns']-initial[0]['monotonic_ns'])/1000
+    success = status=='SUCCESS'
+    rounds = result['rounds']
+    classification = ('RECOVERED_FAULT' if rounds else 'SAFE_TRANSMISSION') if success else (
+        'CORRUPTED_FRAME_REJECTED' if 'CRYPTO' in status or 'HEADER' in status else
+        'PROTOCOL_ABORT_TIMEOUT' if 'TIMEOUT' in status else 'INFORMATION_LOSS_OMISSION')
+    row = dict.fromkeys(columns(), None)
+    row.update(run_id=run_id, trial_idx=trial, scenario_id=sid, scenario_name=name, protocol_name='SIXTY_FOUR_BLOCK',
+               fault_model=fault, injected_dropped_frame_indices=';'.join(map(str,omitted)) or 'NONE', burst_length=burst,
+               channel_loss_rate_p=.2 if mode=='monte_carlo' else 0., payload_corruption_injected=mode in ('corrupt','malformed'),
+               recovery_success=success, recovery_rounds=len(rounds), retransmit_policy='selective_nack_bitmap',
+               nack_frames_issued_count=len(rounds), nack_bitmaps_issued_hex=';'.join(r['bitmap'] for r in rounds) or 'N_A',
+               initial_frames_sent=len(initial), retransmitted_frames_count=retransmits, control_frames_count=len(rounds),
+               end_to_end_latency_us=latency, nominal_clean_time_us=0., recovery_overhead_latency_us=0.,
+               nack_turnaround_time_us=next(((r['first_rx_ns']-r['tx_ns'])/1000 for r in rounds if 'first_rx_ns' in r),None),
+               retry_exhaustion_flag=status=='ERR_RETRY_EXHAUSTION', termination_status_code=status,
+               iso26262_failure_classification=classification, ftti_budget_us=config['ftti_us'],
+               ftti_violation_flag=latency>config['ftti_us'],
+               safety_state_achieved='OPERATIONAL' if success and latency<=config['ftti_us'] else 'SAFE_FALLBACK')
+    for i in range(3):
+        row[f'round_{i+1}_requested_frames'] = rounds[i]['requested'] if i<len(rounds) else 0
+        row[f'round_{i+1}_recovered_frames'] = rounds[i]['recovered'] if i<len(rounds) else 0
+    return row, dict(domain=domain, config=config, gateway=result, ecu=ecu['result'], status_origin=origin)
+
+
+def attack(run_id, name):
+    identifier = str(uuid.uuid4())
+    started = time.monotonic_ns()
+    atomic('/mailbox/command.json', dict(id=identifier, run_id=run_id, attack=name))
+    deadline = time.monotonic()+8
+    expected = {'replay':'replay_rejected','forged_tag':'runtime_tag_rejected',
+                'spoof_domain':'header_rejected','flood':'rate_limit_rejected'}[name]
+    result = {}
+    while time.monotonic()<deadline:
+        path = Path('/mailbox/result.json')
+        if path.exists():
+            result = json.loads(path.read_text())
+        observed = [e for e in read_events() if e['node']=='gateway-d1' and e['monotonic_ns']>=started and e['event']==expected]
+        if result.get('id')==identifier and 'error' in result:
+            break
+        if result.get('id')==identifier and observed:
+            crossed = [e for e in read_events() if e['node'] in ('gateway-d2','gateway-d3','gateway-d4')
+                       and e['monotonic_ns']>=started and e['event']=='rx']
+            return dict(attack=name, attack_id=identifier, start_ns=started, transmitted=result['transmitted'],
+                        observed_event=expected, observed_count=len(observed), other_domain_rx=len(crossed), passed=not crossed)
+        time.sleep(.1)
+    return dict(attack=name, passed=False, error=result.get('error','Expected gateway decision not observed'))
+
+
+def audit(path):
+    path = Path(path)
+    errors = validate(path/'fault_recovery_runs.csv', enforce_delivered_requests=False)
+    metadata = json.loads((path/'manifest.json').read_text())
+    with (path/'fault_recovery_runs.csv').open() as stream:
+        rows = list(csv.DictReader(stream))
+    events = [json.loads(line) for line in (path/'events.jsonl').read_text().splitlines()]
+    for filename, expected in metadata['sha256'].items():
+        if hashlib.sha256((path/filename).read_bytes()).hexdigest()!=expected:
+            errors.append(f'Hash mismatch: {filename}')
+    for row in rows:
+        log = [e for e in events if e.get('run_id')==row['run_id']]
+        data = [e for e in log if e['node'].startswith('ecu') and e['event']=='tx' and e.get('can_id')=='0x200']
+        if len(data)!=int(row['initial_frames_sent'])+int(row['retransmitted_frames_count']):
+            errors.append(f'{row["run_id"]}: actual transmission count mismatch')
+        accepts = [e for e in log if e['node'].startswith('gateway') and e['event']=='fragment_accepted']
+        accepted = set()
+        bitmaps = []
+        for event in log:
+            if event['event']=='fragment_accepted':
+                if event['frame_idx'] in accepted:
+                    errors.append(f'{row["run_id"]}: duplicate accepted fragment')
+                accepted.add(event['frame_idx'])
+            if event['node'].startswith('gateway') and event['event']=='tx' and event.get('can_id')=='0x201':
+                bitmap = struct.unpack('>BBBBIQ', bytes.fromhex(event['payload_hex']))[-1]
+                expected = sum(1 << i for i in set(range(41))-accepted)
+                if bitmap != expected:
+                    errors.append(f'{row["run_id"]}: transmitted NACK disagrees with receiver state')
+                bitmaps.append(f'0x{bitmap:016x}')
+        if (';'.join(bitmaps) or 'N_A') != row['nack_bitmaps_issued_hex']:
+            errors.append(f'{row["run_id"]}: CSV bitmap differs from transmitted bytes')
+        omitted = sorted(set(e['frame_idx'] for e in log if e['event']=='injected_drop' and e.get('can_id')=='0x200' and e['round']==0))
+        if (';'.join(map(str,omitted)) or 'NONE')!=row['injected_dropped_frame_indices']:
+            errors.append(f'{row["run_id"]}: CSV drop string differs from relay evidence')
+        for rnd in range(1,4):
+            if sum(e['round']==rnd for e in accepts)!=int(row[f'round_{rnd}_recovered_frames']):
+                errors.append(f'{row["run_id"]}: round {rnd} recovery evidence mismatch')
+        if row['recovery_success']=='True':
+            if len(accepted)!=41:
+                errors.append(f'{row["run_id"]}: incomplete successful assembly')
+            auth = [e for e in log if e['event']=='authentication']
+            if not any(e.get('ascon_tag_valid') is True and e.get('mldsa_signature_valid') is True for e in auth):
+                errors.append(f'{row["run_id"]}: success lacks authentication evidence')
+    return errors
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--health-only', action='store_true')
+    parser.add_argument('--validate-only', action='store_true')
+    parser.add_argument('--monte-carlo', type=int, default=5)
+    args = parser.parse_args()
+    if args.validate_only:
+        latest = json.loads(Path('/exports/latest.json').read_text())
+        errors = audit(Path('/exports')/latest['directory'])
+        print('\n'.join(errors) if errors else 'PASS: SocketCAN CSV and saved evidence')
+        return bool(errors)
+    await_ready()
+    if args.health_only:
+        print('All four ECUs, gateway and relay are ready on SocketCAN.')
+        return 0
+    import fcntl
+    run_lock = open("/exports/.run.lock", "a")
+    try:
+        fcntl.flock(run_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise SystemExit("Another experiment suite is already running.")
+    suite = str(uuid.uuid4())
+    out = Path('/exports')/suite
+    out.mkdir()
+    rows, records, baselines, checks = [], {}, {}, []
+    work = [(d,s,0) for s in CANONICAL for d in range(1,5)]
+    work += [(1,('persistent',2,CANONICAL[1][2],'SINGLE_FRAME_DROP',[12]),0),
+             (1,('nack_drop',2,CANONICAL[1][2],'NACK_CONTROL_FRAME_DROP',[12]),0),
+             (1,('corrupt',1,CANONICAL[0][2],'PAYLOAD_BIT_FLIP',[]),0),
+             (1,('malformed',1,CANONICAL[0][2],'PAYLOAD_BIT_FLIP',[]),0)]
+    work += [(1,('monte_carlo',0,'Monte Carlo Loss Sweep','BERNOULLI_RANDOM',[]),i) for i in range(args.monte_carlo)]
+    work += [(1,CANONICAL[0],1)]  # Fresh session for runtime attacks.
+    for number,(domain,scenario,trial) in enumerate(work):
+        row, record = execute(domain,scenario,trial,20260907+number)
+        if scenario[0]=='clean':
+            baselines[domain]=row
+        row['nominal_clean_time_us']=baselines[domain]['end_to_end_latency_us']
+        row['recovery_overhead_latency_us']=row['end_to_end_latency_us']-row['nominal_clean_time_us']
+        record['baseline_run_id']=baselines[domain]['run_id']
+        records[row['run_id']]=record
+        rows.append(row)
+        expected = {'persistent':'ERR_RETRY_EXHAUSTION','nack_drop':'ERR_TIMEOUT_NACK_WAIT',
+                    'corrupt':'ERR_CRYPTO_TAG_MISMATCH','malformed':'ERR_HEADER_OUT_OF_RANGE'}.get(scenario[0],'SUCCESS')
+        passed = scenario[0]=='monte_carlo' or row['termination_status_code']==expected
+        if scenario in CANONICAL:
+            passed = passed and row['retransmitted_frames_count']==len(scenario[4]) and row['round_1_recovered_frames']==len(scenario[4])
+        if row['recovery_success']:
+            passed = passed and record['gateway']['diagnostic_accepted']>0 and record['ecu']['status']=='SUCCESS'
+        checks.append(dict(run_id=row['run_id'], passed=passed, expected=expected if scenario[0]!='monte_carlo' else 'observational'))
+        print(f'{number+1:02d} {domain} {scenario[0]:12s} {row["termination_status_code"]:28s} {row["end_to_end_latency_us"]:.3f} us',flush=True)
+    attacks = [attack(rows[-1]['run_id'],name) for name in ['replay','forged_tag','spoof_domain','flood']]
+    # Wait for queued flood packets to drain before taking the evidence snapshot.
+    time.sleep(1)
+    events = [e for e in read_events() if e.get('run_id') in records]
+    with (out/'fault_recovery_runs.csv').open('w',newline='') as stream:
+        writer=csv.DictWriter(stream,fieldnames=columns());writer.writeheader();writer.writerows(rows)
+    (out/'events.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events))
+    specs=profile()
+    for name in ('bitrate_regime','nominal_baud','data_baud','total_frames_on_wire','total_wire_bytes','goodput_efficiency_pct'):
+        specs[name]['description']='Unavailable: virtual SocketCAN, no physical CAN controller.'
+    (out/'measurement_profile.json').write_text(json.dumps(specs,indent=2))
+    capture = Path('/captures/candump.log')
+    if capture.exists():
+        (out/'candump_since_lab_start.log').write_bytes(capture.read_bytes())
+    artifacts=['fault_recovery_runs.csv','events.jsonl','measurement_profile.json']
+    if (out/'candump_since_lab_start.log').exists():
+        artifacts.append('candump_since_lab_start.log')
+    metadata=dict(profile='phase2-docker-socketcan-v1', suite=suite, created_epoch_ns=time.time_ns(),
+                  transport='Linux CAN-FD vxcan, independent Docker namespaces; no datagram fallback',
+                  python=sys.version, kernel=platform.release(),
+                  dependencies={name:importlib.metadata.version(name) for name in ('cryptography','dilithium-py')},
+                  container_runtime=json.loads(Path('/runtime.json').read_text()) if Path('/runtime.json').is_file() else None,
+                  runs=records, scenario_checks=checks, attacks=attacks,
+                  strict_phase3_errors=validate(out/'fault_recovery_runs.csv',strict=True,enforce_delivered_requests=False),
+                  sha256={name:hashlib.sha256((out/name).read_bytes()).hexdigest() for name in artifacts},
+                  source_sha256={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest()
+                                 for p in [*Path.cwd().glob('*.py'), *list((ROOT/'Phase 1/CAN FD/Crypto Code').glob('*.py')),
+                                           ROOT/'Phase 3/config/data_contract_schemas.json']})
+    (out/'manifest.json').write_text(json.dumps(metadata,indent=2))
+    errors=audit(out)
+    passed=not errors and all(c['passed'] for c in checks+attacks)
+    atomic('/exports/latest.json',dict(directory=suite, passed=passed, runs=len(rows), attacks=attacks, errors=errors))
+    print(json.dumps(dict(passed=passed, runs=len(rows), attacks=attacks, errors=errors),indent=2))
+    return not passed
+
+
+if __name__=='__main__':
+    raise SystemExit(main())

@@ -15,7 +15,7 @@ import os
 import random
 import sys
 import time
-import numpy as np
+import statistics
 
 # Path routing
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -23,7 +23,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 CRYPTO_CODE_DIR = os.path.abspath(
-    os.path.join(BASE_DIR, "..", "..", "Phase 1", "Crypto", "Code")
+    os.path.join(BASE_DIR, "..", "..", "..", "Phase 1", "CAN FD", "Crypto Code")
 )
 if CRYPTO_CODE_DIR not in sys.path:
     sys.path.insert(0, CRYPTO_CODE_DIR)
@@ -112,7 +112,7 @@ class ProtocolFuzzer:
             "fpr": 0.0 if fp == 0 else 1.0,
             "precision": 1.0, "f1": 1.0,
             "roc_auc": 1.0,
-            "latency_ms": float(np.mean(latencies)),
+            "latency_ms": float(statistics.fmean(latencies)),
             "primary_gate": "Cat2_Sequence_Reassembly_Gate",
             "status": "PASS" if tp == 1 and fp == 0 else "FAIL",
         }
@@ -148,7 +148,7 @@ class ProtocolFuzzer:
             "fpr": 0.0 if fp == 0 else 1.0,
             "precision": 1.0, "f1": 1.0,
             "roc_auc": 1.0,
-            "latency_ms": float(np.mean(latencies)),
+            "latency_ms": float(statistics.fmean(latencies)),
             "primary_gate": "Cat2_Sequence_Reassembly_Gate",
             "status": "PASS" if tp == 1 and fp == 0 else "FAIL",
         }
@@ -182,7 +182,7 @@ class ProtocolFuzzer:
             "tp": tp, "fp": fp, "tn": tn, "fn": fn,
             "recall": 1.0 if tp == 1 else 0.0,
             "fpr": 0.0, "precision": 1.0, "f1": 1.0, "roc_auc": 1.0,
-            "latency_ms": float(np.mean(latencies)),
+            "latency_ms": float(statistics.fmean(latencies)),
             "primary_gate": "Cat2_Header_Metadata_Validation",
             "status": "PASS" if tp == 1 and fp == 0 else "FAIL",
         }
@@ -216,13 +216,14 @@ class ProtocolFuzzer:
             "tp": tp, "fp": fp, "tn": tn, "fn": fn,
             "recall": 1.0 if tp == 1 else 0.0,
             "fpr": 0.0, "precision": 1.0, "f1": 1.0, "roc_auc": 1.0,
-            "latency_ms": float(np.mean(latencies)),
+            "latency_ms": float(statistics.fmean(latencies)),
             "primary_gate": "Cat2_Session_Binding_Gate",
             "status": "PASS" if tp == 1 and fp == 0 else "FAIL",
         }
 
     def run_at11_nack_exhaustion_3retries(self) -> dict:
-        """AT-11: Protocol — NACK Recovery Exhaustion (3 Retries)."""
+        """In-process rejection loop; not a measured SocketCAN NACK exchange."""
+        started_ns = time.perf_counter_ns()
         tp = fp = tn = fn = 0
         nack_attempts = 0
         session_aborted = False
@@ -248,7 +249,7 @@ class ProtocolFuzzer:
             "tp": tp, "fp": 0, "tn": 1, "fn": fn,
             "recall": 1.0 if tp == 1 else 0.0,
             "fpr": 0.0, "precision": 1.0, "f1": 1.0, "roc_auc": 1.0,
-            "latency_ms": 0.500,  # 500 ms timeout per NACK cycle
+            "latency_ms": (time.perf_counter_ns() - started_ns) / 1_000_000,
             "primary_gate": "NACK_0x201_Retry_Limiter",
             "status": "PASS" if session_aborted else "FAIL",
         }

@@ -17,7 +17,7 @@ import struct
 import sys
 
 CRYPTO_CODE_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "Phase 1", "Crypto", "Code")
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "Phase 1", "CAN FD", "Crypto Code")
 )
 if CRYPTO_CODE_DIR not in sys.path:
     sys.path.insert(0, CRYPTO_CODE_DIR)

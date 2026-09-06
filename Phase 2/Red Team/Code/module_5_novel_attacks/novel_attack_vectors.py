@@ -27,7 +27,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 CRYPTO_CODE_DIR = os.path.abspath(
-    os.path.join(BASE_DIR, "..", "..", "Phase 1", "Crypto", "Code")
+    os.path.join(BASE_DIR, "..", "..", "..", "Phase 1", "CAN FD", "Crypto Code")
 )
 if CRYPTO_CODE_DIR not in sys.path:
     sys.path.insert(0, CRYPTO_CODE_DIR)

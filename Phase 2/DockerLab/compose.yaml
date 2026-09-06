@@ -1,0 +1,138 @@
+name: pqc-phase2
+x-app: &app
+  image: pqc-can-lab:local
+  user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
+  build:
+    context: ../..
+    dockerfile: Phase 2/DockerLab/Dockerfile
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  cap_add: [NET_RAW]
+  security_opt: [no-new-privileges:true]
+  networks: [management]
+  pids_limit: 128
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=2)"]
+    interval: 3s
+    timeout: 3s
+    retries: 45
+services:
+  relay:
+    <<: *app
+    environment: {ROLE: relay}
+    volumes: [./state/logs:/logs]
+  gateway:
+    <<: *app
+    environment: {ROLE: gateway}
+    volumes:
+      - ./state/credentials/gateway.json:/credentials/identity.json:ro
+      - ./state/logs:/logs
+  ecu1:
+    <<: *app
+    environment: {ROLE: ecu, DOMAIN: '1'}
+    volumes:
+      - ./state/credentials/ecu1.json:/credentials/identity.json:ro
+      - ./state/logs/ecu1:/logs/ecu1
+  ecu2:
+    <<: *app
+    environment: {ROLE: ecu, DOMAIN: '2'}
+    volumes:
+      - ./state/credentials/ecu2.json:/credentials/identity.json:ro
+      - ./state/logs/ecu2:/logs/ecu2
+  ecu3:
+    <<: *app
+    environment: {ROLE: ecu, DOMAIN: '3'}
+    volumes:
+      - ./state/credentials/ecu3.json:/credentials/identity.json:ro
+      - ./state/logs/ecu3:/logs/ecu3
+  ecu4:
+    <<: *app
+    environment: {ROLE: ecu, DOMAIN: '4'}
+    volumes:
+      - ./state/credentials/ecu4.json:/credentials/identity.json:ro
+      - ./state/logs/ecu4:/logs/ecu4
+  attacker:
+    image: pqc-can-lab:local
+    user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
+    command: [python, attacker.py]
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [NET_RAW]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    volumes:
+      - ./state/mailbox:/mailbox
+      - ./state/logs/attacker:/logs/attacker
+  controller:
+    <<: *app
+    profiles: [tools]
+    command: [python, controller.py]
+    cap_add: []
+    healthcheck: {disable: true}
+    volumes:
+      - ./state/logs:/logs:ro
+      - ./state/mailbox:/mailbox
+      - ./state/exports:/exports
+      - ./state/captures:/captures:ro
+      - ./state/runtime.json:/runtime.json:ro
+  observer:
+    image: pqc-can-lab:local
+    user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
+    command: [python, observer.py]
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_RAW]
+    network_mode: service:gateway
+    depends_on: [gateway]
+    security_opt: [no-new-privileges:true]
+    volumes: [./state/captures:/captures]
+  dashboard:
+    <<: *app
+    command: [python, dashboard.py]
+    cap_add: []
+    healthcheck: {disable: true}
+    networks: [management, display]
+    ports: ['127.0.0.1:8088:8080']
+    volumes:
+      - ./state/logs:/logs:ro
+      - ./state/exports:/exports:ro
+  loki:
+    image: grafana/loki:3.7.0
+    profiles: [observability]
+    command: [-config.file=/etc/loki/local-config.yaml]
+    networks: [management]
+    volumes: [loki:/loki]
+  alloy:
+    image: grafana/alloy:v1.19.0
+    profiles: [observability]
+    command: [run, /etc/alloy/config.alloy, --storage.path=/var/lib/alloy]
+    networks: [management]
+    volumes:
+      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
+      - ./state/logs:/logs:ro
+      - alloy:/var/lib/alloy
+  grafana:
+    image: grafana/grafana:12.4.0
+    profiles: [observability]
+    networks: [management, display]
+    ports: ['127.0.0.1:3000:3000']
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+    volumes:
+      - ./observability/provisioning:/etc/grafana/provisioning:ro
+      - grafana:/var/lib/grafana
+networks:
+  management: {internal: true}
+  display: {}
+volumes:
+  loki: {}
+  alloy: {}
+  grafana: {}

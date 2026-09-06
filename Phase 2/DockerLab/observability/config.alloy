@@ -1,0 +1,13 @@
+local.file_match "lab" {
+  path_targets = [{ "__path__" = "/logs/*/events.jsonl", "job" = "pqc-can-lab" }]
+  sync_period = "1s"
+}
+loki.source.file "lab" {
+  targets = local.file_match.lab.targets
+  forward_to = [loki.write.local.receiver]
+}
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
