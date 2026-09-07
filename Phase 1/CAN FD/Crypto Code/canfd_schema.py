@@ -233,6 +233,107 @@ class ProtectedRuntimeFrame:
             "diagnostic_flags": unpacked[11],
         }
 
+    @classmethod
+    def pack_frame(
+        cls,
+        sender_ecu_id: int,
+        domain_id: int,
+        counter: int,
+        payload_bytes: bytes,
+        key: bytes,
+        is_emergency: bool = False,
+        direction: int = 0x00,
+    ) -> bytes:
+        """
+        Pack and encrypt a 64-byte Category 1 Runtime Frame using AUTOSAR SecOC
+        deterministic implicit nonce derivation (SWS_SecOC_00034).
+        """
+        if len(payload_bytes) != cls.PAYLOAD_SIZE:
+            raise ValueError(f"Expected {cls.PAYLOAD_SIZE}B payload, got {len(payload_bytes)}B")
+        if len(key) != 16:
+            raise ValueError(f"Expected 16B key, got {len(key)}B")
+
+        header_ad = cls.pack_unencrypted_header(
+            sender_ecu_id=sender_ecu_id,
+            domain_id=domain_id,
+            counter=counter,
+            is_emergency=is_emergency,
+        )
+
+        nonce = SessionManager.derive_runtime_nonce(
+            ecu_id=sender_ecu_id,
+            domain_id=domain_id,
+            counter=counter,
+            direction=direction,
+        )
+
+        ciphertext, tag = AsconAEAD128Engine.encrypt(
+            key=key,
+            nonce=nonce,
+            plaintext=payload_bytes,
+            associated_data=header_ad,
+        )
+
+        frame = header_ad + ciphertext + tag
+        assert len(frame) == CANFD_DLC15_SIZE, f"Frame size error: {len(frame)} != {CANFD_DLC15_SIZE}"
+        return frame
+
+    @classmethod
+    def unpack_and_decrypt(
+        cls,
+        frame_bytes: bytes,
+        key: bytes,
+        expected_direction: int = 0x00,
+    ) -> Tuple[Dict[str, Any], bytes, bool]:
+        """
+        Unpack and decrypt a 64-byte Category 1 Runtime Frame.
+        Derives the deterministic nonce independently from the 8-byte header fields.
+
+        Returns
+        -------
+        Tuple[Dict[str, Any], bytes, bool]
+            (header_dict, decrypted_payload_or_empty, is_tag_valid)
+        """
+        if len(frame_bytes) != CANFD_DLC15_SIZE:
+            raise ValueError(f"Expected {CANFD_DLC15_SIZE}B frame, got {len(frame_bytes)}B")
+        if len(key) != 16:
+            raise ValueError(f"Expected 16B key, got {len(key)}B")
+
+        header_bytes = frame_bytes[: cls.UNENCRYPTED_HEADER_SIZE]
+        ver_type, sender_ecu_id, domain_id, flags, counter = struct.unpack(
+            cls.UNENCRYPTED_HEADER_FMT, header_bytes
+        )
+
+        header_dict = {
+            "ver_type": ver_type,
+            "sender_ecu_id": sender_ecu_id,
+            "domain_id": domain_id,
+            "flags": flags,
+            "counter": counter,
+        }
+
+        ciphertext = frame_bytes[cls.UNENCRYPTED_HEADER_SIZE : cls.UNENCRYPTED_HEADER_SIZE + cls.PAYLOAD_SIZE]
+        tag = frame_bytes[cls.UNENCRYPTED_HEADER_SIZE + cls.PAYLOAD_SIZE :]
+
+        nonce = SessionManager.derive_runtime_nonce(
+            ecu_id=sender_ecu_id,
+            domain_id=domain_id,
+            counter=counter,
+            direction=expected_direction,
+        )
+
+        try:
+            plaintext = AsconAEAD128Engine.decrypt(
+                key=key,
+                nonce=nonce,
+                ciphertext=ciphertext,
+                associated_data=header_bytes,
+                tag=tag,
+            )
+            return header_dict, plaintext, True
+        except ValueError:
+            return header_dict, b"", False
+
 
 class IndexedAttestationFrame:
     """

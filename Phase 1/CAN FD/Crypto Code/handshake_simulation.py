@@ -210,18 +210,28 @@ def main():
     section("STEP 8  [ECU->CISG]  Cat 1 Runtime Telemetry (First Frame)")
 
     COUNTER  = 1
-    nonce_rt = SessionManager.generate_nonce()
     header_ad = ProtectedRuntimeFrame.pack_unencrypted_header(ECU_ID, DOMAIN_ID, COUNTER)
     payload_pt = ProtectedRuntimeFrame.pack_telemetry_payload(
         speed=72.5, rpm=1800.0, steering_angle=2.3, brake_pressure=0.0,
         throttle_pos=25.0, long_accel=0.2, lat_accel=0.05,
         wheel_speed_fl=725, wheel_speed_fr=724, engine_temp=88, gear_status=3, dtc_flags=0,
     )
-    ct_rt, tag_rt = AsconAEAD128Engine.encrypt(k_i_ecu, nonce_rt, payload_pt, header_ad)
-    cat1_frame = header_ad + ct_rt + tag_rt
+    # Pack frame using AUTOSAR SecOC deterministic implicit nonce derivation (SWS_SecOC_00034)
+    cat1_frame = ProtectedRuntimeFrame.pack_frame(
+        sender_ecu_id=ECU_ID,
+        domain_id=DOMAIN_ID,
+        counter=COUNTER,
+        payload_bytes=payload_pt,
+        key=k_i_ecu,
+        direction=0x00,
+    )
+    nonce_rt = SessionManager.derive_runtime_nonce(ECU_ID, DOMAIN_ID, COUNTER, direction=0x00)
+    ct_rt = cat1_frame[8:48]
+    tag_rt = cat1_frame[48:64]
     assert len(cat1_frame) == 64
     print("  [ECU]  Cat 1 frame ({}B) transmitted.".format(len(cat1_frame)))
     print("         Header (AD)  : {}".format(header_ad.hex()))
+    print("         SecOC Nonce  : {}".format(nonce_rt.hex()))
     print("         Ciphertext   : {}...  ({}B)".format(ct_rt[:8].hex(), len(ct_rt)))
     print("         Ascon tag    : {}".format(tag_rt.hex()))
 
@@ -237,13 +247,15 @@ def main():
     print("  [CISG] Monotonic counter gate (counter={}) : {}".format(COUNTER, "PASS" if gate else "FAIL"))
     assert gate
 
-    try:
-        decrypted = AsconAEAD128Engine.decrypt(k_i, nonce_rt, ct_rt, header_ad, tag_rt)
-        is_valid  = True
+    # CISG unpacks and decrypts frame: derives deterministic nonce independently from header
+    hdr_dict, decrypted, is_valid = ProtectedRuntimeFrame.unpack_and_decrypt(
+        frame_bytes=cat1_frame,
+        key=k_i,
+        expected_direction=0x00,
+    )
+    if is_valid:
         print("  [CISG] Ascon-AEAD128 tag VERIFIED. Payload decrypted ({}B).".format(len(decrypted)))
-    except ValueError:
-        decrypted = b""
-        is_valid  = False
+    else:
         print("  [CISG] Tag FAILED. Frame dropped.")
 
     vec = extractor.extract_features(

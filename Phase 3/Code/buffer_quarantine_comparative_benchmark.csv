@@ -1,0 +1,4 @@
+Attack_Scenario,Target_CAN_ID,Mode_A_FPR,Mode_B_FPR,FPR_Suppression,Mode_A_Recall,Mode_B_Recall,Post_Attack_Smearing_Frames_A,Post_Attack_Smearing_Frames_B,Mode_A_F1,Mode_B_F1,Mode_A_Latency_ms,Mode_B_Latency_ms,ASIL_D_Status
+Speedometer Masquerade (Run 1),0x0D0 (208),1.21%,1.21%,-0.00%,100.00%,100.00%,35,35,0.9845,0.9845,3.512,2.948,DEGRADED
+Correlated Wheel Speed (Run 1),0x6E0 (1760),2.94%,2.94%,-0.00%,100.00%,100.00%,22,22,0.9914,0.9914,3.729,4.625,DEGRADED
+Engine Coolant Temp Spoofing,0x4E7 (1255),99.08%,99.08%,-0.00%,2.33%,2.33%,16,16,0.0077,0.0077,7.167,3.901,DEGRADED

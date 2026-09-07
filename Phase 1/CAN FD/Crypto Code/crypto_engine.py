@@ -47,6 +47,7 @@ last_counters state. See canfd_schema.py GatewayIDSExtractor for details.
 
 import os
 import hashlib
+import struct
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from dilithium_py.ml_dsa import ML_DSA_44
@@ -488,6 +489,51 @@ class SessionManager:
         """
         return os.urandom(16)
 
+    @staticmethod
+    def derive_runtime_nonce(
+        ecu_id: int,
+        domain_id: int,
+        counter: int,
+        direction: int = 0x00,
+    ) -> bytes:
+        """
+        Derives a deterministic 16-byte nonce for Category 1 Ascon-AEAD128 frames
+        conforming to AUTOSAR SecOC SWS_SecOC_00034 (Data ID + Freshness binding).
+
+        Layout (16 Bytes Total, Big-Endian):
+            [0:2]   2B  ecu_id      (uint16 BE)
+            [2]     1B  domain_id   (uint8)
+            [3]     1B  direction   (uint8: 0x00=ECU->CISG, 0x01=CISG->ECU)
+            [4:12]  8B  padding     (b'\\x00' * 8)
+            [12:16] 4B  counter     (uint32 BE)
+
+        Parameters
+        ----------
+        ecu_id : int
+            Sender ECU identifier (0-65535).
+        domain_id : int
+            CAN domain identifier (0-255).
+        counter : int
+            Monotonic frame sequence counter (uint32).
+        direction : int
+            Communication direction (0x00=ECU->CISG, 0x01=CISG->ECU).
+
+        Returns
+        -------
+        bytes
+            16-byte deterministic nonce.
+        """
+        if not (0 <= ecu_id <= 0xFFFF):
+            raise ValueError(f"ecu_id out of range (0-65535): {ecu_id}")
+        if not (0 <= domain_id <= 0xFF):
+            raise ValueError(f"domain_id out of range (0-255): {domain_id}")
+        if not (0 <= counter <= 0xFFFFFFFF):
+            raise ValueError(f"counter out of range (uint32): {counter}")
+        if direction not in (0x00, 0x01):
+            raise ValueError(f"direction must be 0x00 or 0x01, got {direction}")
+
+        return struct.pack(">HBB8sI", ecu_id, domain_id, direction, b"\x00" * 8, counter)
+
 
 # ---------------------------------------------------------------------------
 # Self-test (run with: python crypto_engine.py)
@@ -626,6 +672,15 @@ if __name__ == "__main__":
     assert len(n1) == 16
     print(f"    Random challenge: {c1.hex()}")
     print(f"    Session key K_i : {k1.hex()}")
+
+    # Test AUTOSAR SecOC deterministic runtime nonce derivation
+    d_nonce1 = SessionManager.derive_runtime_nonce(ecu_id=0x10, domain_id=0x01, counter=100, direction=0x00)
+    d_nonce2 = SessionManager.derive_runtime_nonce(ecu_id=0x10, domain_id=0x01, counter=100, direction=0x00)
+    d_nonce3 = SessionManager.derive_runtime_nonce(ecu_id=0x10, domain_id=0x01, counter=101, direction=0x00)
+    assert d_nonce1 == d_nonce2, "Deterministic nonce derivation must be repeatable"
+    assert d_nonce1 != d_nonce3, "Different counters must produce different nonces"
+    assert len(d_nonce1) == 16, "Nonce must be exactly 16 bytes"
+    print(f"    SecOC Nonce (ctr=100): {d_nonce1.hex()}")
     print("    PASS ")
 
     print("\n" + "=" * 60)

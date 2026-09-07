@@ -1,0 +1,37 @@
+{
+  "milestone": "M3.1",
+  "description": "3-Way Transport Protocol Evaluation (Castiglione vs ISO-TP vs 60/4)",
+  "generated_utc": "2026-09-06T16:38:58.923295+00:00",
+  "runtime_environment": {
+    "python_version": "3.13.5",
+    "numpy_version": "2.2.6",
+    "matplotlib_version": "3.10.8",
+    "os_platform": "Windows-11-10.0.26200-SP0",
+    "cpu_architecture": "AMD64"
+  },
+  "config_provenance": {
+    "config_file": "Anti Gravity/Phase 3/config/transport_simulation_config.json",
+    "config_sha256": "dd1d9ffff1bde6d43f0ad329059251a3775095fb47611fc227129a811e680bd6"
+  },
+  "execution_parameters": {
+    "random_seed": 42,
+    "mc_trials_per_point": 0,
+    "loss_sweep_points": 11,
+    "bitrate_regimes_evaluated": [
+      "castiglione_baseline_1mbps",
+      "production_canfd_2mbps",
+      "high_perf_canfd_5mbps"
+    ]
+  },
+  "output_artifacts": {
+    "figures": [
+      "transport_wire_bytes_vs_loss.png",
+      "transport_completion_latency_vs_loss.png",
+      "transport_goodput_efficiency_vs_loss.png"
+    ],
+    "data": [
+      "transport_protocol_benchmark_data.csv",
+      "deterministic_scenarios_results.json"
+    ]
+  }
+}

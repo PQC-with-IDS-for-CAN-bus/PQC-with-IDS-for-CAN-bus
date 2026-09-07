@@ -1,0 +1,10 @@
+priority,can_id_hex,name,domain_name,period_ms,deadline_ms,c_frame_ms,b_i_ms,w_i_ms,r_i_ms,slack_ms,schedulable,r_i_segmented_ms,slack_segmented_ms,asil_class
+1,0x0D0,Powertrain / Engine ECM Control,Powertrain,10.0,10.0,0.4005,0.4005,0.4625,0.863,9.137,True,0.863,9.137,ASIL-D
+2,0x180,Transmission & Traction Control,Powertrain,10.0,10.0,0.2405,0.4005,0.863,1.1035,8.8965,True,1.1035,8.8965,ASIL-D
+3,0x354,Chassis Control (Steering & Braking),Chassis,20.0,20.0,0.4005,0.4005,1.1035,1.504,18.496,True,0.863,19.137,ASIL-D
+4,0x200,PQC ML-DSA-44 Boot Attestation Burst,Powertrain,1000.0,50.0,0.4005,0.4005,23.1865,23.587,26.413,True,22.5435,27.4565,ASIL-D
+5,0x201,Selective NACK Error Recovery,Powertrain,1000.0,25.0,0.158,0.4005,18.5655,18.7235,6.2765,True,17.9225,7.0775,ASIL-D
+6,0x6E0,Wheel Speeds (4 Individual Wheels),Chassis,20.0,20.0,0.4005,0.4005,18.7235,19.124,0.876,True,0.863,19.137,ASIL-D
+7,0x4E7,Engine Thermal Management,Body,50.0,50.0,0.4005,0.4005,19.124,19.5245,30.4755,True,0.703,49.297,ASIL-B
+8,0x5A0,Body Control Module (BCM),Body,50.0,50.0,0.2405,0.4005,19.5245,19.765,30.235,True,0.703,49.297,ASIL-A
+9,0x7E0,OBD-II Diagnostics & UDS Telemetry,Infotainment_OBD,100.0,100.0,0.4005,0.0,19.3645,19.765,80.235,True,0.4625,99.5375,QM

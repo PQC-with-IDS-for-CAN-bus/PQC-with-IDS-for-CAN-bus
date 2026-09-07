@@ -83,6 +83,65 @@ class TestProtectedRuntimeFrame(unittest.TestCase):
         with self.assertRaises(ValueError):
             ProtectedRuntimeFrame.unpack_telemetry_payload(b"\x00" * 20)
 
+    def test_pack_and_unpack_decrypt_deterministic_nonce(self):
+        ecu_id = 0x20
+        domain_id = 0x01
+        counter = 12345
+        key = b"16ByteSessionKey"
+
+        payload = ProtectedRuntimeFrame.pack_telemetry_payload(
+            speed=85.0, rpm=2400.0, steering_angle=0.0, brake_pressure=0.0,
+            throttle_pos=30.0, long_accel=0.1, lat_accel=0.0,
+            wheel_speed_fl=850, wheel_speed_fr=850, engine_temp=90, gear_status=4, dtc_flags=0,
+        )
+
+        frame = ProtectedRuntimeFrame.pack_frame(
+            sender_ecu_id=ecu_id,
+            domain_id=domain_id,
+            counter=counter,
+            payload_bytes=payload,
+            key=key,
+            direction=0x00,
+        )
+        self.assertEqual(len(frame), CANFD_DLC15_SIZE)
+
+        hdr_dict, decrypted, is_valid = ProtectedRuntimeFrame.unpack_and_decrypt(
+            frame_bytes=frame,
+            key=key,
+            expected_direction=0x00,
+        )
+        self.assertTrue(is_valid)
+        self.assertEqual(decrypted, payload)
+        self.assertEqual(hdr_dict["sender_ecu_id"], ecu_id)
+        self.assertEqual(hdr_dict["domain_id"], domain_id)
+        self.assertEqual(hdr_dict["counter"], counter)
+
+    def test_unpack_decrypt_tamper_fails(self):
+        ecu_id = 0x20
+        domain_id = 0x01
+        counter = 500
+        key = b"16ByteSessionKey"
+        payload = b"\x00" * 40
+
+        frame = ProtectedRuntimeFrame.pack_frame(
+            sender_ecu_id=ecu_id,
+            domain_id=domain_id,
+            counter=counter,
+            payload_bytes=payload,
+            key=key,
+        )
+
+        # Mutate 1 byte of ciphertext (payload area: bytes 8 to 48)
+        tampered = bytearray(frame)
+        tampered[20] ^= 0xFF
+
+        hdr_dict, decrypted, is_valid = ProtectedRuntimeFrame.unpack_and_decrypt(
+            frame_bytes=bytes(tampered),
+            key=key,
+        )
+        self.assertFalse(is_valid)
+        self.assertEqual(decrypted, b"")
+
 
 class TestIndexedAttestationFrame(unittest.TestCase):
     def test_pack_unpack_frame(self):

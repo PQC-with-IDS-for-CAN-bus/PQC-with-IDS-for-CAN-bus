@@ -436,7 +436,7 @@
         },
         "ide_flag": {
           "type": "uint8",
-          "description": "Identifier Extension flag: 0 = 11-bit standard CAN 2.0A, 1 = 29-bit extended CAN 2.0B",
+          "description": "Identifier Extension flag: 0 = 11-bit standard base ID (FBFF), 1 = 29-bit extended ID (FEFF) per ISO 11898-1:2015",
           "enum": [0, 1],
           "source": "IEEE/ASAM Auditor — ASAM MDF4 CAN_DataFrame.IDE; ORNL ROAD dataset convention",
           "nullable": false
