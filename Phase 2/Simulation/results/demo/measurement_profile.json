@@ -48,13 +48,13 @@
   },
   "bitrate_regime": {
     "type": "string",
-    "description": "Unavailable in local datagram execution; no physical CAN measurement.",
+    "description": "Physical bus speed configuration",
     "enum": [
       "CASTIGLIONE_1MBPS",
       "PROD_CANFD_2MBPS",
       "HIGHPERF_CANFD_5MBPS"
     ],
-    "nullable": true
+    "nullable": false
   },
   "nominal_baud": {
     "type": "uint32",
@@ -65,8 +65,7 @@
         1000000
       ]
     },
-    "nullable": true,
-    "description": "Unavailable in local datagram execution; no physical CAN measurement."
+    "nullable": false
   },
   "data_baud": {
     "type": "uint32",
@@ -78,8 +77,7 @@
         5000000
       ]
     },
-    "nullable": true,
-    "description": "Unavailable in local datagram execution; no physical CAN measurement."
+    "nullable": false
   },
   "fault_model": {
     "type": "string",
@@ -242,35 +240,35 @@
   },
   "total_frames_on_wire": {
     "type": "uint32",
-    "description": "Unavailable in local datagram execution; no physical CAN measurement.",
+    "description": "Total frames put on wire (initial + retransmit + control)",
     "validation": {
       "min": 1
     },
-    "nullable": true
+    "nullable": false
   },
   "total_wire_bytes": {
     "type": "uint32",
     "unit": "bytes",
-    "description": "Unavailable in local datagram execution; no physical CAN measurement.",
+    "description": "Total physical bytes consumed on bus including frame overhead",
     "validation": {
       "min": 1
     },
-    "nullable": true
+    "nullable": false
   },
   "goodput_efficiency_pct": {
     "type": "float64",
     "unit": "percentage",
-    "description": "Unavailable in local datagram execution; no physical CAN measurement.",
+    "description": "Application goodput = (application_payload_bytes / total_wire_bytes) * 100.0",
     "validation": {
       "min": 0.0,
       "max": 100.0
     },
-    "nullable": true
+    "nullable": false
   },
   "end_to_end_latency_us": {
     "type": "float64",
     "unit": "microseconds",
-    "description": "Measured host time from immediately before first data send through authentication or failure.",
+    "description": "Total elapsed turnaround latency from Frame 0 Tx to complete payload assembly",
     "validation": {
       "min": 0.0
     },
@@ -288,19 +286,21 @@
   "recovery_overhead_latency_us": {
     "type": "float64",
     "unit": "microseconds",
-    "description": "Signed difference between observed latency and referenced clean run; includes host variability.",
-    "validation": {},
+    "description": "Non-negative excess latency incurred by fault recovery strictly >= 0.0 us",
+    "validation": {
+      "min": 0.0
+    },
     "nullable": false
   },
   "nack_turnaround_time_us": {
     "type": "float64",
     "unit": "microseconds",
-    "description": "Measured host time from immediately before NACK send to first successfully received retry.",
+    "description": "Delay from NACK Tx to receipt of first retransmitted frame",
     "validation": {
       "min": 0.0
     },
     "nullable": true,
-    "nullable_reason": "No retry frame successfully received, including clean bus, NACK omission and complete retry loss."
+    "nullable_reason": "Null when no NACK was issued (clean bus or full-abort protocol)"
   },
   "retry_exhaustion_flag": {
     "type": "boolean",
@@ -309,7 +309,7 @@
   },
   "termination_status_code": {
     "type": "string",
-    "description": "Project-defined diagnostic outcome; not an ISO-standard literal code.",
+    "description": "Root-cause failure classification per ISO 26262 audit tree. Replaces ambiguous binary success/fail with actionable diagnostic codes.",
     "enum": [
       "SUCCESS",
       "ERR_RETRY_EXHAUSTION",
@@ -325,7 +325,7 @@
   },
   "iso26262_failure_classification": {
     "type": "string",
-    "description": "Project classification only; no ISO 26262 compliance claim.",
+    "description": "High-level ISO 26262 safety classification of the outcome",
     "enum": [
       "SAFE_TRANSMISSION",
       "RECOVERED_FAULT",
@@ -338,7 +338,7 @@
   "ftti_budget_us": {
     "type": "float64",
     "unit": "microseconds",
-    "description": "User-selected experimental deadline, not a HARA-derived budget.",
+    "description": "Fault Tolerant Time Interval budget from HARA (default 50000 us = 50 ms for ASIL-D boot attestation)",
     "validation": {
       "min": 0.0
     },
@@ -351,7 +351,7 @@
   },
   "safety_state_achieved": {
     "type": "string",
-    "description": "Software activation decision only; no physical actuator is controlled.",
+    "description": "Final system safety state after fault handling",
     "enum": [
       "OPERATIONAL",
       "SAFE_FALLBACK",

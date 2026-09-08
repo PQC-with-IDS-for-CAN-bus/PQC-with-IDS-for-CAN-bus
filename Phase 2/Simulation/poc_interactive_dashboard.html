@@ -1172,10 +1172,9 @@
         }
       });
 
-      // Reset matrix blocks if Phase A is not running or done
-      if (!phaseAPlaying) {
-        resetPhaseA();
-      }
+      // Reset matrix blocks and cancel any in-flight timers with new scenario
+      pausePhaseA();
+      resetPhaseA();
     }
 
     // =========================================================================
@@ -1262,15 +1261,59 @@
 
     // Phase A Execution Controller
     const pSteps = [
-      { id: 'pstep-1', name: '1. SRAM-PUF Silicon Reconstruction', durationMs: 2500, fastMs: 80 },
-      { id: 'pstep-2', name: '2. HKDF Ephemeral Bootstrap Key', durationMs: 2200, fastMs: 20 },
-      { id: 'pstep-3', name: '3. NIST FIPS 204 ML-DSA-44 Signing', durationMs: 2800, fastMs: 35 },
-      { id: 'pstep-4', name: '4. 41-Frame Transit & Burst Drop', durationMs: 3200, fastMs: 40 },
-      { id: 'pstep-5', name: '5. 64-bit Selective Bitmap NACK Recovery', durationMs: 3000, fastMs: 30 },
-      { id: 'pstep-6', name: '6. Gateway Verification & K_session', durationMs: 2500, fastMs: 25 }
+      { id: 'pstep-1', name: '1. SRAM-PUF Silicon Reconstruction', durationMs: 2500, fastMs: 120 },
+      { id: 'pstep-2', name: '2. HKDF Ephemeral Bootstrap Key', durationMs: 2200, fastMs: 60 },
+      { id: 'pstep-3', name: '3. NIST FIPS 204 ML-DSA-44 Signing', durationMs: 2800, fastMs: 80 },
+      { id: 'pstep-4', name: '4. 41-Frame Transit & Burst Drop', durationMs: 3200, fastMs: 400 },
+      { id: 'pstep-5', name: '5. 64-bit Selective Bitmap NACK Recovery', durationMs: 3000, fastMs: 350 },
+      { id: 'pstep-6', name: '6. Gateway Verification & K_session', durationMs: 2500, fastMs: 100 }
     ];
 
+    // Standard styling constants for the 41-Frame Segmentation Buffer
+    const FBLOCK_STYLE_STANDBY = 'py-1 rounded bg-slate-800 border border-slate-700 text-slate-400 font-mono transition-all';
+    const FBLOCK_STYLE_RECEIVED = 'py-1 rounded bg-emerald-950 border border-emerald-600 text-emerald-300 font-mono font-bold transition-all';
+    const FBLOCK_STYLE_DROPPED = 'py-1 rounded bg-red-950 border border-red-500 text-red-400 font-mono font-bold animate-pulse transition-all';
+    const FBLOCK_STYLE_CORRUPTED = 'py-1 rounded bg-purple-950 border border-purple-500 text-purple-300 font-mono font-bold animate-pulse transition-all';
+    const FBLOCK_STYLE_RECOVERED = 'py-1 rounded bg-cyan-900 border-2 border-cyan-400 text-cyan-200 font-mono font-bold shadow-md shadow-cyan-400/40 transition-all';
+
+    let phaseATimeouts = [];
+    function clearPhaseATimeouts() {
+      phaseATimeouts.forEach(t => clearTimeout(t));
+      phaseATimeouts = [];
+    }
+
+    // Deterministically set 41-frame matrix appearance based on active stage
+    function renderFramesGridStatic(stepNum) {
+      const sc = NOISE_SCENARIOS[currentNoiseKey] || NOISE_SCENARIOS['relay_transient'];
+      const droppedSet = new Set(sc.droppedFrames || []);
+
+      for (let f = 0; f < 41; f++) {
+        const block = document.getElementById(`fblock-${f}`);
+        if (!block) continue;
+
+        if (stepNum <= 3) {
+          // Stages 0-3: Standby / unreceived
+          block.className = FBLOCK_STYLE_STANDBY;
+        } else if (stepNum === 4) {
+          // Stage 4: Transmitted on wire with dropped / corrupted frames
+          if (droppedSet.has(f)) {
+            block.className = (sc.faultModel === 'PAYLOAD_BIT_FLIP') ? FBLOCK_STYLE_CORRUPTED : FBLOCK_STYLE_DROPPED;
+          } else {
+            block.className = FBLOCK_STYLE_RECEIVED;
+          }
+        } else if (stepNum >= 5) {
+          // Stages 5-6: NACK recovered! Every dropped frame turns bright CYAN/BLUE
+          if (droppedSet.has(f)) {
+            block.className = FBLOCK_STYLE_RECOVERED;
+          } else {
+            block.className = FBLOCK_STYLE_RECEIVED;
+          }
+        }
+      }
+    }
+
     function setPStepVisual(stepNum) {
+      clearPhaseATimeouts();
       phaseAStep = stepNum;
       
       // Update sidebar step cards
@@ -1278,94 +1321,144 @@
         const el = document.getElementById(`pstep-${i}`);
         const badge = document.getElementById(`badge-pstep-${i}`);
         if (i < stepNum) {
-          el.className = 'p-2.5 rounded-lg border step-complete transition-all flex flex-col gap-1';
-          badge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold';
-          badge.textContent = 'DONE';
+          if (el) el.className = 'p-2.5 rounded-lg border step-complete transition-all flex flex-col gap-1';
+          if (badge) {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold';
+            badge.textContent = 'DONE';
+          }
         } else if (i === stepNum) {
-          el.className = 'p-2.5 rounded-lg border step-active transition-all flex flex-col gap-1';
-          badge.className = 'text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold animate-pulse';
-          badge.textContent = 'ACTIVE';
+          if (el) el.className = 'p-2.5 rounded-lg border step-active transition-all flex flex-col gap-1';
+          if (badge) {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold animate-pulse';
+            badge.textContent = 'ACTIVE';
+          }
         } else {
-          el.className = 'p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1 opacity-60';
-          badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400';
-          badge.textContent = 'STANDBY';
+          if (el) el.className = 'p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1 opacity-60';
+          if (badge) {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+            badge.textContent = 'STANDBY';
+          }
         }
       }
 
       const callout = document.getElementById('phasea-live-callout');
       const clock = document.getElementById('phasea-clock');
+      const sc = NOISE_SCENARIOS[currentNoiseKey] || NOISE_SCENARIOS['relay_transient'];
+      const droppedSet = new Set(sc.droppedFrames || []);
 
-      if (stepNum === 1) {
-        callout.innerHTML = '<strong class="text-cyan-300">Stage 1: Silicon Entropy Reconstruction.</strong> Fuzzy Extractor decoding noisy uninitialized SRAM bitcells. PBKDF2-HMAC-SHA256 executing 100,000 rounds. No keys stored on flash!';
-        clock.textContent = '79.19 ms';
-        // Fire PUF particles from ECU
-        for (let j = 0; j < 15; j++) {
-          pParticles.push({ x: 80 + Math.random() * 20, vx: 0.5 + Math.random() * 0.5, radius: 3, color: '#00f0ff', isDropped: false });
+      if (stepNum === 0) {
+        if (callout) callout.innerHTML = '<span class="font-bold text-white">Stage 0 Ready:</span> Click "Run Phase A" or "Run Complete Simulation" to watch silicon PUF reconstruction.';
+        if (clock) clock.textContent = '0.00 ms';
+        renderFramesGridStatic(0);
+      } else if (stepNum === 1) {
+        if (callout) callout.innerHTML = '<strong class="text-cyan-300">Stage 1: Silicon Entropy Reconstruction.</strong> Fuzzy Extractor decoding noisy uninitialized SRAM bitcells. PBKDF2-HMAC-SHA256 executing 100,000 rounds. No keys stored on flash!';
+        if (clock) clock.textContent = '79.19 ms';
+        renderFramesGridStatic(1);
+        if (phaseAPlaying) {
+          for (let j = 0; j < 15; j++) {
+            pParticles.push({ x: 80 + Math.random() * 20, vx: 0.5 + Math.random() * 0.5, radius: 3, color: '#00f0ff', isDropped: false });
+          }
         }
       } else if (stepNum === 2) {
-        callout.innerHTML = '<strong class="text-blue-300">Stage 2: HKDF-Extract & Expand.</strong> Gateway Nonce + PUF secret combined. Ephemeral Bootstrap Key K_boot_i derived for Category 2 transport.';
-        clock.textContent = '82.40 ms';
+        if (callout) callout.innerHTML = '<strong class="text-blue-300">Stage 2: HKDF-Extract & Expand.</strong> Gateway Nonce + PUF secret combined. Ephemeral Bootstrap Key K_boot_i derived for Category 2 transport.';
+        if (clock) clock.textContent = '82.40 ms';
+        renderFramesGridStatic(2);
       } else if (stepNum === 3) {
-        callout.innerHTML = '<strong class="text-purple-300">Stage 3: NIST FIPS 204 Lattice Signing.</strong> Computing Dilithium ML-DSA-44 post-quantum digital signature. Generating 2,420 bytes authenticating silicon identity.';
-        clock.textContent = '109.24 ms';
+        if (callout) callout.innerHTML = '<strong class="text-purple-300">Stage 3: NIST FIPS 204 Lattice Signing.</strong> Computing Dilithium ML-DSA-44 post-quantum digital signature. Generating 2,420 bytes authenticating silicon identity.';
+        if (clock) clock.textContent = '109.24 ms';
+        renderFramesGridStatic(3);
       } else if (stepNum === 4) {
-        const sc = NOISE_SCENARIOS[currentNoiseKey] || NOISE_SCENARIOS['relay_transient'];
-        callout.innerHTML = sc.callout4;
-        clock.textContent = sc.latencyMs || '128.50 ms';
-        // Animate 41 frames
-        for (let f = 0; f < 41; f++) {
-          const isTarget = sc.droppedFrames.includes(f);
-          const block = document.getElementById(`fblock-${f}`);
-          setTimeout(() => {
-            if (isTarget) {
-              if (sc.faultModel === 'PAYLOAD_BIT_FLIP') {
-                if (block) block.className = 'py-1 rounded bg-purple-950 border border-purple-600 text-purple-300 font-mono font-bold animate-pulse';
-                pParticles.push({ x: 80, vx: 3.5, radius: 4.5, color: '#c084fc', isDropped: true, dropLabel: 'CRC FAIL!', label: `#${f}` });
+        if (callout) callout.innerHTML = sc.callout4;
+        if (clock) clock.textContent = sc.latencyMs || '128.50 ms';
+
+        if (!phaseAPlaying) {
+          // Instant static rendering for scrubbing or paused inspection
+          renderFramesGridStatic(4);
+        } else {
+          // Animated wire transmission
+          for (let f = 0; f < 41; f++) {
+            const block = document.getElementById(`fblock-${f}`);
+            if (block) block.className = FBLOCK_STYLE_STANDBY;
+          }
+
+          const frameInterval = Math.max(8, Math.round(35 / phaseASpeedMultiplier));
+          for (let f = 0; f < 41; f++) {
+            const isTarget = droppedSet.has(f);
+            phaseATimeouts.push(setTimeout(() => {
+              const block = document.getElementById(`fblock-${f}`);
+              if (isTarget) {
+                if (sc.faultModel === 'PAYLOAD_BIT_FLIP') {
+                  if (block) block.className = FBLOCK_STYLE_CORRUPTED;
+                  pParticles.push({ x: 80, vx: 3.5, radius: 4.5, color: '#c084fc', isDropped: true, dropLabel: 'CRC FAIL!', label: `#${f}` });
+                } else {
+                  if (block) block.className = FBLOCK_STYLE_DROPPED;
+                  pParticles.push({ x: 80, vx: 3.5, radius: 4.5, color: '#ff3344', isDropped: true, dropLabel: 'DROP!', label: `#${f}` });
+                }
               } else {
-                if (block) block.className = 'py-1 rounded bg-red-950 border border-red-700 text-red-400 font-mono font-bold animate-pulse';
-                pParticles.push({ x: 80, vx: 3.5, radius: 4.5, color: '#ff3344', isDropped: true, dropLabel: 'DROP!', label: `#${f}` });
+                if (block) block.className = FBLOCK_STYLE_RECEIVED;
+                pParticles.push({ x: 80, vx: 3.5, radius: 4, color: '#00ff66', isDropped: false, label: `#${f}` });
               }
-            } else {
-              if (block) block.className = 'py-1 rounded bg-emerald-950 border border-emerald-700 text-emerald-400 font-mono font-bold';
-              pParticles.push({ x: 80, vx: 3.5, radius: 4, color: '#00ff66', isDropped: false, label: `#${f}` });
-            }
-          }, f * 35);
+            }, f * frameInterval));
+          }
         }
       } else if (stepNum === 5) {
-        const sc = NOISE_SCENARIOS[currentNoiseKey] || NOISE_SCENARIOS['relay_transient'];
-        callout.innerHTML = sc.callout5;
-        clock.textContent = '148.90 ms';
+        if (callout) callout.innerHTML = sc.callout5;
+        if (clock) clock.textContent = '148.90 ms';
 
-        if (sc.droppedFrames.length === 0) {
-          // Nominal Clean: No NACK required, all frames already green
-        } else if (sc.isNackLoss) {
-          // NACK control frame dropped in transit (Round 1) ➔ Round 2 timeout
-          pParticles.push({ x: pCanvas.width - 90, vx: -3.5, radius: 5, color: '#f43f5e', isDropped: true, dropLabel: 'NACK R1 DROP', label: 'NACK_R1' });
-          setTimeout(() => {
-            // Round 2 NACK timer recovers
-            pParticles.push({ x: pCanvas.width - 90, vx: -4.0, radius: 4.5, color: '#00f0ff', isDropped: false, label: 'NACK_R2' });
-            setTimeout(() => {
-              const block = document.getElementById('fblock-12');
-              if (block) block.className = 'py-1 rounded bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono font-bold';
-              pParticles.push({ x: 80, vx: 4.0, radius: 5, color: '#00f0ff', isDropped: false, label: '#12R' });
-            }, 450);
-          }, 700);
+        if (!phaseAPlaying) {
+          // Instant static rendering: in Stage 5, all dropped frames are displayed as RECOVERED CYAN!
+          renderFramesGridStatic(5);
         } else {
-          // Standard selective retransmission
-          const delayStep = sc.droppedFrames.length > 5 ? 70 : 140;
-          sc.droppedFrames.forEach((f, idx) => {
-            setTimeout(() => {
-              const block = document.getElementById(`fblock-${f}`);
-              if (block) block.className = 'py-1 rounded bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono font-bold';
-              pParticles.push({ x: 80, vx: 4.0, radius: 5, color: '#00f0ff', isDropped: false, label: `#${f}R` });
-            }, idx * delayStep);
-          });
+          // Animated NACK Recovery Sequence:
+          // 1. Ensure intact frames are green and dropped frames start red/corrupted
+          renderFramesGridStatic(4);
+
+          if (sc.droppedFrames.length === 0) {
+            // Clean Nominal: 0 drops, immediately all green
+            renderFramesGridStatic(5);
+          } else if (sc.isNackLoss) {
+            // Two-Tier NACK loss: Round 1 NACK drops ➔ Round 2 timeout recovers
+            pParticles.push({ x: pCanvas.width - 90, vx: -3.5, radius: 5, color: '#f43f5e', isDropped: true, dropLabel: 'NACK R1 DROP', label: 'NACK_R1' });
+            
+            const r2Delay = Math.max(200, Math.round(700 / phaseASpeedMultiplier));
+            phaseATimeouts.push(setTimeout(() => {
+              // Round 2 NACK timer fires and recovers
+              pParticles.push({ x: pCanvas.width - 90, vx: -4.0, radius: 4.5, color: '#00f0ff', isDropped: false, label: 'NACK_R2' });
+              
+              const retransDelay = Math.max(150, Math.round(450 / phaseASpeedMultiplier));
+              phaseATimeouts.push(setTimeout(() => {
+                const block = document.getElementById('fblock-12');
+                if (block) block.className = FBLOCK_STYLE_RECOVERED;
+                pParticles.push({ x: 80, vx: 4.0, radius: 5, color: '#00f0ff', isDropped: false, label: '#12R' });
+              }, retransDelay));
+            }, r2Delay));
+          } else {
+            // Standard selective retransmission
+            // 1. Gateway sends NACK bitmap frame across bus to ECU
+            pParticles.push({ x: pCanvas.width - 90, vx: -4.5, radius: 5, color: '#00f0ff', isDropped: false, label: 'NACK_TX' });
+
+            const nackTransitTime = Math.max(120, Math.round(350 / phaseASpeedMultiplier));
+            const delayStep = Math.max(35, Math.round((sc.droppedFrames.length > 5 ? 70 : 140) / phaseASpeedMultiplier));
+
+            sc.droppedFrames.forEach((f, idx) => {
+              phaseATimeouts.push(setTimeout(() => {
+                const block = document.getElementById(`fblock-${f}`);
+                if (block) block.className = FBLOCK_STYLE_RECOVERED;
+                pParticles.push({ x: 80, vx: 4.0, radius: 5, color: '#00f0ff', isDropped: false, label: `#${f}R` });
+              }, nackTransitTime + idx * delayStep));
+            });
+          }
         }
       } else if (stepNum === 6) {
-        callout.innerHTML = '<strong class="text-emerald-300">Stage 6: Attestation SUCCESS!</strong> ML-DSA signature verified in 22.14 ms. Operational Session Key established: <code class="text-cyan-300">2d7579de...</code>. Gateway ready for Phase B!';
-        clock.textContent = '171.04 ms';
-        document.getElementById('gateway-state-badge').textContent = 'OPERATIONAL (ATTRIBUTED)';
-        document.getElementById('orchestrator-status').textContent = 'PHASE A COMPLETE ➔ STARTING PHASE B';
+        if (callout) callout.innerHTML = '<strong class="text-emerald-300">Stage 6: Attestation SUCCESS!</strong> ML-DSA signature verified in 22.14 ms. Operational Session Key established: <code class="text-cyan-300">2d7579de...</code>. Gateway ready for Phase B!';
+        if (clock) clock.textContent = '171.04 ms';
+        const gwBadge = document.getElementById('gateway-state-badge');
+        if (gwBadge) gwBadge.textContent = 'OPERATIONAL (ATTRIBUTED)';
+        const orchStatus = document.getElementById('orchestrator-status');
+        if (orchStatus) orchStatus.textContent = 'PHASE A COMPLETE ➔ STARTING PHASE B';
+
+        // In Stage 6, 100% of frames are intact/recovered: render full static buffer!
+        renderFramesGridStatic(6);
       }
 
       // Update Phase A YouTube-Style Scrubber & Readout
@@ -1379,7 +1472,7 @@
       }
 
       const pTimeLabel = document.getElementById('phasea-scrubber-time');
-      if (pTimeLabel) pTimeLabel.textContent = `Time: ${clock.textContent} / 171.04 ms`;
+      if (pTimeLabel && clock) pTimeLabel.textContent = `Time: ${clock.textContent} / 171.04 ms`;
     }
 
     let phaseASpeedMultiplier = 1.0;
@@ -1467,18 +1560,19 @@
       const headerPlayBtn = document.getElementById('btn-phasea-play');
       if (headerPlayBtn) headerPlayBtn.innerHTML = '<span>▶ Run Phase A</span>';
       if (phaseATimer) clearTimeout(phaseATimer);
+      clearPhaseATimeouts();
     }
 
     function resetPhaseA() {
+      clearPhaseATimeouts();
       pausePhaseA();
       phaseAStep = 0;
-      for (let f = 0; f < 41; f++) {
-        const b = document.getElementById(`fblock-${f}`);
-        if (b) b.className = 'py-1 rounded bg-slate-800 border border-slate-700 text-slate-400 font-mono transition-all';
-      }
+      renderFramesGridStatic(0);
       setPStepVisual(0);
-      document.getElementById('phasea-live-callout').innerHTML = '<span class="font-bold text-white">Stage 0 Ready:</span> Click "Run Phase A" or "Run Complete Simulation" to watch silicon PUF reconstruction.';
-      document.getElementById('phasea-clock').textContent = '0.00 ms';
+      const callout = document.getElementById('phasea-live-callout');
+      if (callout) callout.innerHTML = '<span class="font-bold text-white">Stage 0 Ready:</span> Click "Run Phase A" or "Run Complete Simulation" to watch silicon PUF reconstruction.';
+      const clock = document.getElementById('phasea-clock');
+      if (clock) clock.textContent = '0.00 ms';
       const pTimeLabel = document.getElementById('phasea-scrubber-time');
       if (pTimeLabel) pTimeLabel.textContent = 'Time: 0.00 ms / 171.04 ms';
     }
@@ -1488,8 +1582,11 @@
     });
     document.getElementById('btn-phasea-step').addEventListener('click', () => {
       pausePhaseA();
-      if (phaseAStep >= 6) resetPhaseA();
-      setPStepVisual(phaseAStep + 1);
+      if (phaseAStep >= 6) {
+        resetPhaseA();
+      } else {
+        setPStepVisual(phaseAStep + 1);
+      }
     });
     document.getElementById('btn-phasea-reset').addEventListener('click', resetPhaseA);
 
