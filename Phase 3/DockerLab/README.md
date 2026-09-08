@@ -1,5 +1,16 @@
-# Docker PQC / CAN-FD laboratory
+# Phase 3 Deliverable: Docker CAN-FD Empirical Benchmarking Laboratory
 
+This laboratory is the **official Phase 3 empirical benchmarking environment** for our Post-Quantum Cryptography (PQC) and 3-Tier Intrusion Detection System (IDS) framework over CAN-FD.
+
+---
+
+## 1. Architectural Scope & Purpose (Phase 3 Deliverable)
+
+- **Barebones Containerized Software Simulation:** Executes 4 independent ECU containers (Powertrain, Chassis, Body, Infotainment), an unenrolled attacker node, and a Central In-Vehicle Security Gateway (CISG) over isolated Linux SocketCAN (\xcan\) virtual interfaces.
+- **Empirical vs. Mathematical Comparison:** While the **Phase 2 Simulation Suite** serves as the algorithmic and protocol proof-of-concept, **DockerLab** measures true empirical end-to-end wire transit times, host execution latency, context switches, and microarchitectural cache misses (\perf stat\).
+- **Phase 3 Data Contracts Validation:** Emits empirical datasets (\perf_stat_summary.csv\, \	cpdump_latency_summary.csv\, \ault_recovery_runs.csv\) designed for direct comparison against the closed-form **worst-case response time (WCRT / Davis-Burns CAN-FD RTA)** mathematical model developed in Phase 3.
+
+---
 This lab runs **four independent ECU containers**, a central security gateway,
 four isolated logical CAN domains, a controlled fault relay, an unenrolled attacker,
 and an independent `candump` observer. CAN frames travel through the Linux
@@ -14,8 +25,8 @@ No fixture performance values or generated vehicle measurements are used.
 From the repository root:
 
 ```bash
-python3 'Phase 2/DockerLab/lab.py' up
-python3 'Phase 2/DockerLab/lab.py' run
+python3 'Phase 3/DockerLab/lab.py' up
+python3 'Phase 3/DockerLab/lab.py' run
 ```
 
 Open **http://localhost:8088** before running the second command to watch the
@@ -25,19 +36,19 @@ the latest result includes the actual attack decisions and validation outcome.
 
 ```bash
 # Check the running nodes.
-python3 'Phase 2/DockerLab/lab.py' status
+python3 'Phase 3/DockerLab/lab.py' status
 
 # Follow the real container stdout logs.
-python3 'Phase 2/DockerLab/lab.py' logs
+python3 'Phase 3/DockerLab/lab.py' logs
 
 # Recheck the latest saved CSV and byte-level evidence.
-python3 'Phase 2/DockerLab/lab.py' validate
+python3 'Phase 3/DockerLab/lab.py' validate
 
 # Add Grafana, Alloy and Loki; Grafana is at http://localhost:3000.
-python3 'Phase 2/DockerLab/lab.py' observe
+python3 'Phase 3/DockerLab/lab.py' observe
 
 # Stop only this project's containers/networks. Evidence and enrollment survive.
-python3 'Phase 2/DockerLab/lab.py' down
+python3 'Phase 3/DockerLab/lab.py' down
 ```
 
 The host needs Linux Docker Engine, Docker Compose, Python 3 for the launcher,
@@ -208,7 +219,7 @@ By default, `run` performs **30 actual handshakes** and four runtime attacks:
 Use `--monte-carlo N` to change the number of random-loss runs:
 
 ```bash
-python3 'Phase 2/DockerLab/lab.py' run --monte-carlo 20
+python3 'Phase 3/DockerLab/lab.py' run --monte-carlo 20
 ```
 
 The default per-frame application pacing is 1 ms; recovery receive timeout is
@@ -328,3 +339,4 @@ Documentation consulted: [Docker Compose](https://docs.docker.com/reference/comp
 [vxcan/container architecture](https://www.systec-electronic.com/en/blog/article/news-socketcan-docker-die-loesung),
 [can-utils](https://github.com/linux-can/can-utils), and
 [Alloy file collection](https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.file/).
+

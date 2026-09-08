@@ -6,7 +6,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 COPY ["Phase 1/CAN FD/Crypto Code", "/workspace/Phase 1/CAN FD/Crypto Code"]
 COPY ["Phase 3/config/data_contract_schemas.json", "/workspace/Phase 3/config/data_contract_schemas.json"]
 COPY ["Phase 2/Simulation/contracts.py", "/workspace/Phase 2/Simulation/contracts.py"]
-COPY ["Phase 2/DockerLab", "/workspace/Phase 2/DockerLab"]
-WORKDIR /workspace/Phase 2/DockerLab
+COPY ["Phase 3/DockerLab", "/workspace/Phase 3/DockerLab"]
+WORKDIR /workspace/Phase 3/DockerLab
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 CMD ["python", "node.py"]

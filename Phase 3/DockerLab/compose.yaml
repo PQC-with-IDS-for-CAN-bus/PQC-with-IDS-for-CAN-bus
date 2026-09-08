@@ -1,10 +1,10 @@
-name: pqc-phase2
+name: pqc-phase3
 x-app: &app
   image: pqc-can-lab:local
   user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
   build:
     context: ../..
-    dockerfile: Phase 2/DockerLab/Dockerfile
+    dockerfile: Phase 3/DockerLab/Dockerfile
   init: true
   read_only: true
   tmpfs: [/tmp]
