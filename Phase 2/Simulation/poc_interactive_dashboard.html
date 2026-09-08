@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PQC CAN-FD & 3-Tier Autonomous IDS — Interactive Mission Control Dashboard</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap');
+    
+    :root {
+      --bg-base: #080b11;
+      --bg-panel: #0e131f;
+      --bg-card: #141b2d;
+      --border-color: #1e293b;
+      --accent-cyan: #00f0ff;
+      --accent-green: #00ff66;
+      --accent-amber: #ffaa00;
+      --accent-red: #ff3344;
+      --accent-purple: #b026ff;
+      --text-main: #e2e8f0;
+      --text-muted: #8492a6;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      overflow-x: hidden;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .glass-panel {
+      background: rgba(14, 19, 31, 0.88);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+    }
+
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.28);
+    }
+    .glow-green {
+      box-shadow: 0 0 25px rgba(0, 255, 102, 0.28);
+    }
+    .glow-red {
+      box-shadow: 0 0 30px rgba(255, 51, 68, 0.45);
+    }
+    .glow-amber {
+      box-shadow: 0 0 25px rgba(255, 170, 0, 0.35);
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080b11;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.92); }
+    }
+    .pulse-dot {
+      animation: pulse-live 1.5s infinite ease-in-out;
+    }
+
+    .step-active {
+      border-color: #00f0ff !important;
+      background: rgba(0, 240, 255, 0.08) !important;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+    }
+    .step-complete {
+      border-color: #00ff66 !important;
+      background: rgba(0, 255, 102, 0.06) !important;
+    }
+    .step-alert {
+      border-color: #ff3344 !important;
+      background: rgba(255, 51, 68, 0.1) !important;
+      box-shadow: 0 0 20px rgba(255, 51, 68, 0.3);
+    }
+  </style>
+</head>
+<body class="p-3 lg:p-5 min-h-screen flex flex-col gap-4">
+
+  <!-- ========================================================================= -->
+  <!-- 1. TOP MASTER ORCHESTRATION & HEADER HUD                                  -->
+  <!-- ========================================================================= -->
+  <header class="glass-panel p-4 lg:p-5 flex flex-col gap-4 border-l-4 border-l-cyan-400">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="inline-block w-3.5 h-3.5 rounded-full bg-emerald-400 pulse-dot"></span>
+          <h1 class="text-xl lg:text-2xl font-black tracking-wide text-white uppercase flex items-center gap-2">
+            Post-Quantum CAN-FD & 3-Tier Autonomous IDS
+            <span class="text-xs font-mono font-normal px-2.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
+              Interactive Mission Control
+            </span>
+          </h1>
+        </div>
+        <p class="text-xs lg:text-sm text-slate-400 mt-1 font-mono">
+          NIST FIPS 204 ML-DSA-44 • SRAM-PUF Silicon Fuzzy Extractor • 60/4 NACK Recovery • Real-Time 100 Hz 3-Tier Gateway
+        </p>
+      </div>
+
+      <!-- System Status Badges -->
+      <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+        <div class="px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 flex flex-col">
+          <span class="text-[9px] text-slate-400 uppercase tracking-wider">Gateway State</span>
+          <span id="gateway-state-badge" class="font-bold text-emerald-400">OPERATIONAL</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 flex flex-col">
+          <span class="text-[9px] text-slate-400 uppercase tracking-wider">Active Session Key</span>
+          <span id="session-key-badge" class="font-bold text-cyan-300">2d75...7437</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 flex flex-col">
+          <span class="text-[9px] text-slate-400 uppercase tracking-wider">Physical Bus</span>
+          <span id="bus-clock-badge" class="font-bold text-yellow-400">100.0 Hz (10.0 ms)</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 flex flex-col">
+          <span class="text-[9px] text-slate-400 uppercase tracking-wider">Gateway Ingress Load</span>
+          <span id="gateway-load-badge" class="font-bold text-emerald-400">3.4% (96.6% Idle)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MASTER TOP ACTION BAR: DUAL-MODE COMPLETE SIMULATION CONTROLS -->
+    <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span class="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider">Run All:</span>
+
+        <!-- MODE 1: SLOWED DOWN PRESENTATION MODE -->
+        <button id="btn-run-slow" class="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold tracking-wide rounded-lg shadow-lg shadow-cyan-900/40 flex items-center gap-2 transition-all text-xs lg:text-sm group border border-cyan-400/30">
+          <svg class="w-4 h-4 fill-current text-white group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
+            <path d="M12 2L4 7v10l8 5 8-5V7l-8-5zm0 2.2L18 8v8l-6 3.8L6 16V8l6-3.8zM10 9v6l5-3-5-3z"/>
+          </svg>
+          <span>🎓 Run All (Slowed-Down Mode)</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-200 border border-cyan-700 hidden sm:inline-block">Defense Pace</span>
+        </button>
+
+        <!-- MODE 2: REAL-TIME 100 HZ MODE -->
+        <button id="btn-run-realtime" class="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold tracking-wide rounded-lg shadow-lg shadow-emerald-900/40 flex items-center gap-2 transition-all text-xs lg:text-sm group border border-emerald-400/30">
+          <svg class="w-4 h-4 fill-current text-white group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+          <span>⚡ Run All (Real-Time 100 Hz Mode)</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-200 border border-emerald-700 hidden sm:inline-block">Line-Rate</span>
+        </button>
+
+        <!-- STOP / RESET ALL -->
+        <button id="btn-stop-all" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-lg text-xs font-mono transition border border-slate-700">
+          ⏹ Reset All
+        </button>
+      </div>
+
+      <!-- Master Pipeline Stage Stepper -->
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <span class="text-slate-400">Current Pipeline:</span>
+        <span id="orchestrator-status" class="px-3 py-1 rounded bg-slate-900 border border-slate-700 text-emerald-400 font-bold">
+          IDLE / READY TO DEMONSTRATE
+        </span>
+      </div>
+    </div>
+  </header>
+
+
+  <!-- ========================================================================= -->
+  <!-- 2. PHASE A: FULL ANIMATED POST-QUANTUM COLD-BOOT ATTESTATION             -->
+  <!-- ========================================================================= -->
+  <section class="glass-panel p-4 lg:p-5 flex flex-col gap-4 border-t-2 border-t-cyan-500">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+      <div>
+        <h2 class="text-base font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+          <span>Phase A: Cold-Boot Hardware Attestation & Transport Recovery</span>
+          <span class="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-mono">Category 2 CAN-FD (CAN ID 0x200)</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5 font-mono">
+          Visualizing Silicon SRAM-PUF Entropy Reconstruction, Dilithium ML-DSA-44 Signing, 41-Frame Transit, Noise Burst Drop, and 64-bit Bitmap NACK Recovery
+        </p>
+      </div>
+
+      <!-- Phase A Controls & Speed Selector -->
+      <div class="flex items-center gap-2 flex-wrap font-mono text-xs">
+        <button id="btn-phasea-play" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition flex items-center gap-1.5">
+          <span>▶ Run Phase A</span>
+        </button>
+        <button id="btn-phasea-step" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition">
+          ⏭ Next Step
+        </button>
+        <button id="btn-phasea-reset" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition">
+          ↺ Reset Phase A
+        </button>
+
+        <span class="text-slate-500 ml-2">Phase A Speed:</span>
+        <button data-aspeed="slow" class="btn-aspeed px-2 py-1 rounded bg-cyan-900 text-cyan-300 font-bold border border-cyan-700">0.25x (Defense Slow-Mo)</button>
+        <button data-aspeed="medium" class="btn-aspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white">0.5x Medium</button>
+        <button data-aspeed="realtime" class="btn-aspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white">1x (~180ms Benchmark)</button>
+      </div>
+    </div>
+
+    <!-- DYNAMIC PHASE A GRAPHICAL VISUAL PIPELINE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+      <!-- LEFT: Interactive Visual Animation Stage Canvas & Node Diagram (7 Cols) -->
+      <div class="lg:col-span-7 flex flex-col gap-3">
+        <!-- Physical Bus Transit Visualizer Canvas (Enlarged to Match Phase B) -->
+        <div class="relative w-full h-80 min-h-[320px] bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col justify-between p-3">
+          
+          <!-- Endpoints Labels -->
+          <div class="flex justify-between items-center text-xs font-mono z-10">
+            <div class="flex items-center gap-2 bg-slate-900/90 px-2.5 py-1 rounded border border-slate-700">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+              <span class="font-bold text-white">ECU 0x20 (Powertrain)</span>
+              <span class="text-[10px] text-slate-400 font-normal">SRAM-PUF Active</span>
+            </div>
+            
+            <div id="phasea-bus-indicator" class="text-center font-mono text-[11px] text-cyan-300 bg-slate-900/80 px-3 py-0.5 rounded border border-cyan-900">
+              CAN-FD Bus: 2.0 Mbps Data / 500 kbps Nom
+            </div>
+
+            <div class="flex items-center gap-2 bg-slate-900/90 px-2.5 py-1 rounded border border-slate-700">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="font-bold text-white">Central Gateway (CISG)</span>
+              <span class="text-[10px] text-slate-400 font-normal">Ingress Filter</span>
+            </div>
+          </div>
+
+          <!-- Canvas for drawing particles, bitcells, and bus wire animation -->
+          <canvas id="phasea-canvas" class="absolute inset-0 w-full h-full"></canvas>
+
+          <!-- Status Overlays / Explanation Banner -->
+          <div class="z-10 flex justify-between items-end text-xs font-mono">
+            <div id="phasea-live-callout" class="bg-slate-900/95 border border-cyan-800 p-2 rounded max-w-md text-[11px] text-cyan-300">
+              <span class="font-bold text-white">Stage 0 Ready:</span> Click "Run Phase A" or "Run Complete Simulation" to watch silicon PUF reconstruction and post-quantum signing.
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-500 uppercase block">Phase A Timing</span>
+              <span id="phasea-clock" class="text-sm font-bold text-cyan-400">0.00 ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 41-FRAME CAN-FD SEGMENTATION & RECOVERY GRID -->
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col gap-2">
+          <div class="flex justify-between items-center text-xs font-mono flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-300">41-Frame Ascon-128 60/4 Segmentation Buffer (CAN ID 0x200):</span>
+              <span id="grid-scenario-badge" class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-mono font-bold">
+                Relay Transient (BURST 3F)
+              </span>
+            </div>
+            <div class="flex items-center gap-3 text-[10px]">
+              <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded bg-emerald-400"></span> Received</span>
+              <span id="grid-legend-drop" class="flex items-center gap-1 text-red-400"><span class="w-2 h-2 rounded bg-red-500"></span> Injected Drop [14, 15, 16]</span>
+              <span class="flex items-center gap-1 text-cyan-400"><span class="w-2 h-2 rounded bg-cyan-400"></span> NACK Recovered</span>
+            </div>
+          </div>
+
+          <!-- 41-Frame Visual Matrix -->
+          <div id="frames-grid" class="grid grid-cols-11 sm:grid-cols-14 md:grid-cols-21 gap-1 text-[9px] font-mono text-center">
+            <!-- Populated dynamically: 41 frame blocks -->
+          </div>
+        </div>
+
+        <!-- YOUTUBE-STYLE PLAYBACK CONTROLLER DECK FOR PHASE A -->
+        <div class="p-3 bg-slate-950/90 rounded-lg border border-slate-800 flex flex-col gap-2 font-mono">
+          
+          <!-- 1. YouTube-Style Scrubbing Timeline across Stages -->
+          <div class="flex flex-col gap-1">
+            <div class="relative w-full flex items-center">
+              <input id="phasea-scrubber" type="range" min="0" max="6" value="0" step="1" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none">
+            </div>
+            <div class="flex justify-between text-[10px] text-slate-500">
+              <span id="phasea-scrubber-stage">Stage 0/6: Standby</span>
+              <span id="phasea-scrubber-time">Time: 0.00 ms / 171.04 ms</span>
+              <span class="text-cyan-400 cursor-pointer hover:underline" id="btn-phasea-scrub-reset">↺ Rewind to Start</span>
+            </div>
+          </div>
+
+          <!-- 2. Media Controls & Speed Row -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/80 text-xs">
+            
+            <!-- Left: Play/Pause, Step Back Stage, Step Forward Stage -->
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <!-- Play / Pause -->
+              <button id="btn-phasea-yt-play" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-md transition flex items-center gap-1 text-xs shadow-md shadow-cyan-900/40">
+                <span id="phasea-yt-play-icon">▶</span>
+                <span id="phasea-yt-play-text">Play</span>
+              </button>
+              <!-- Prev Stage -->
+              <button id="btn-phasea-yt-prev" title="Step Back Stage" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition border border-slate-700 font-bold">
+                ⏮ Prev
+              </button>
+              <!-- Next Stage -->
+              <button id="btn-phasea-yt-next" title="Step Next Stage" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition border border-slate-700 font-bold">
+                ⏭ Next
+              </button>
+            </div>
+
+            <!-- Right: YouTube Speed Presets and Manual Slider -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[11px] text-slate-500 font-bold">Speed:</span>
+              
+              <!-- Presets -->
+              <div class="flex items-center gap-1">
+                <button type="button" class="phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-slate-900 text-slate-400 border-slate-700" data-speed="0.1">0.1x</button>
+                <button type="button" class="phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-slate-900 text-slate-400 border-slate-700" data-speed="0.2">0.2x</button>
+                <button type="button" class="phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-slate-900 text-slate-400 border-slate-700" data-speed="0.5">0.5x</button>
+                <button type="button" class="phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-cyan-500 text-slate-950 border-cyan-400" data-speed="1">1x</button>
+                <button type="button" class="phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-slate-900 text-slate-400 border-slate-700" data-speed="2">2x</button>
+                <button type="button" class="phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-slate-900 text-slate-400 border-slate-700" data-speed="3">3x</button>
+              </div>
+
+              <!-- Manual Slider -->
+              <div class="flex items-center gap-1.5 pl-2 border-l border-slate-800">
+                <input id="slider-phasea-speed" type="range" min="0.1" max="3.0" step="0.1" value="1.0" class="w-20 h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-400">
+                <span id="slider-phasea-val" class="text-[10px] text-cyan-300 font-bold w-7 text-right">1.0x</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: 6-Stage Timeline Stepper with Explanatory Defense Notes (5 Cols) -->
+      <div class="lg:col-span-5 flex flex-col gap-2 font-mono text-xs">
+        
+        <!-- Step 1: SRAM PUF -->
+        <div id="pstep-1" class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span> 1. Hardware SRAM-PUF Silicon Reconstruction
+            </span>
+            <span id="badge-pstep-1" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">STANDBY</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-sans">
+            Evaluates uninitialized SRAM startup bitcells. Fuzzy Extractor executes PBKDF2-HMAC-SHA256 (100k rounds) to reconstruct 256 bits of volatile entropy without non-volatile memory.
+          </p>
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>Latency: <strong class="text-cyan-300">~79.19 ms</strong></span>
+            <span>PUF Digest: <strong class="text-slate-400">db10e04d3c321000...</strong></span>
+          </div>
+        </div>
+
+        <!-- Step 2: HKDF Bootstrap Key -->
+        <div id="pstep-2" class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-blue-400"></span> 2. Challenge & HKDF Bootstrap Key ($K_{\text{boot}, i}$)
+            </span>
+            <span id="badge-pstep-2" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">STANDBY</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-sans">
+            Extracts pseudo-random key from PUF secret bound with Gateway 16B random challenge and domain ID, deriving ephemeral 128-bit key $K_{\text{boot}, i}$.
+          </p>
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>Ephemeral Key: <strong class="text-blue-300">48b9a08929e1fb62...</strong></span>
+            <span>Nonce Replay: <strong class="text-emerald-400">IMMUNE</strong></span>
+          </div>
+        </div>
+
+        <!-- Step 3: ML-DSA-44 Sign -->
+        <div id="pstep-3" class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-purple-400"></span> 3. NIST FIPS 204 ML-DSA-44 Post-Quantum Sign
+            </span>
+            <span id="badge-pstep-3" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">STANDBY</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-sans">
+            ECU computes Module-Lattice digital signature (Dilithium-2) over firmware measurement hash. Generates exact 2,420-byte quantum-safe authentication token.
+          </p>
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>Latency: <strong class="text-purple-300">~26.84 ms</strong></span>
+            <span>Signature Size: <strong class="text-purple-300">2,420 Bytes</strong></span>
+          </div>
+        </div>
+
+        <!-- Step 4: Ascon-128 AEAD 60/4 Fragmentation & Loss -->
+        <div id="pstep-4" class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span> 4. Ascon-128 60/4 Slicing & Noise Injection
+            </span>
+            <span id="badge-pstep-4" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">STANDBY</span>
+          </div>
+
+          <!-- Interactive Noise Model Selector -->
+          <div class="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-950/90 border border-amber-900/40">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-amber-300 font-bold flex items-center gap-1.5">
+                <span>⚡ Fault Injection Scenario:</span>
+              </span>
+              <span id="badge-noise-severity" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono font-bold">
+                BURST (3 FRAMES)
+              </span>
+            </div>
+
+            <!-- Dropdown -->
+            <select id="select-noise-scenario" class="w-full bg-slate-900 border border-amber-600/50 hover:border-amber-400 text-amber-200 rounded px-2 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-amber-400 transition-all cursor-pointer">
+              <optgroup label="Canonical Automotive Scenarios (Kunal's Benchmark)">
+                <option value="relay_transient" selected>Inductive Relay Transient Spike (Burst [14, 15, 16])</option>
+                <option value="clean_nominal">Clean Bus Nominal (0 Drops - 100% First Pass)</option>
+                <option value="single_drop">Isolated Single Frame Drop (Frame 12)</option>
+                <option value="late_drop">Late-Sequence Frame Drop (Frame 38 Boundary)</option>
+                <option value="alternator_burst">Alternator Commutation Burst (Severe 8-Frame [20..27])</option>
+              </optgroup>
+              <optgroup label="Fault Injection & Red Team Attacks">
+                <option value="payload_bitflip">Payload Bit-Flip / CRC Corruption (Frame 12 AEAD Mismatch)</option>
+                <option value="nack_drop">NACK Control Frame Drop (Round 1 Lost ➔ Round 2 Timer)</option>
+              </optgroup>
+              <optgroup label="Statistical Loss Sweeps">
+                <option value="monte_carlo_random">Monte Carlo Random Loss (20% Bernoulli - 9 Frames)</option>
+              </optgroup>
+            </select>
+
+            <!-- Quick Preset Pill Buttons -->
+            <div class="flex items-center gap-1 flex-wrap pt-0.5">
+              <button type="button" class="noise-pill-btn px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-bold border border-amber-400 text-[10px] transition-all" data-scenario="relay_transient">Relay (3F)</button>
+              <button type="button" class="noise-pill-btn px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 text-[10px] transition-all" data-scenario="clean_nominal">Clean (0F)</button>
+              <button type="button" class="noise-pill-btn px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 text-[10px] transition-all" data-scenario="single_drop">Single (1F)</button>
+              <button type="button" class="noise-pill-btn px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 text-[10px] transition-all" data-scenario="alternator_burst">Alternator (8F)</button>
+              <button type="button" class="noise-pill-btn px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 text-[10px] transition-all" data-scenario="payload_bitflip">Bit-Flip</button>
+              <button type="button" class="noise-pill-btn px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 text-[10px] transition-all" data-scenario="nack_drop">NACK Loss</button>
+              <button type="button" class="noise-pill-btn px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 text-[10px] transition-all" data-scenario="monte_carlo_random">Random (20%)</button>
+            </div>
+          </div>
+
+          <p id="pstep-4-desc" class="text-[11px] text-slate-400 font-sans">
+            Payload (2,420B sig + 16B tag = 2,436B) sliced into 41 CAN-FD frames. Physical transient bus noise corrupts and drops frames 14, 15, and 16.
+          </p>
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>Frames: <strong class="text-amber-300">41 Frames (DLC=64)</strong></span>
+            <span>Noise Injected: <strong id="pstep-4-targets" class="text-red-400 font-mono font-bold">Frames [14, 15, 16]</strong></span>
+          </div>
+          <div class="text-[10px] text-slate-500 flex justify-between border-t border-slate-800/80 pt-1">
+            <span>Fault Model: <strong id="pstep-4-model" class="text-amber-300 font-mono">BURST_FRAME_DROP</strong></span>
+            <span>Goodput: <strong id="pstep-4-goodput" class="text-emerald-400 font-mono">86.02%</strong></span>
+          </div>
+        </div>
+
+        <!-- Step 5: 64-bit Selective Bitmap NACK Recovery -->
+        <div id="pstep-5" class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span> 5. 64-bit Selective Bitmap NACK Recovery
+            </span>
+            <span id="badge-pstep-5" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">STANDBY</span>
+          </div>
+          <p id="pstep-5-desc" class="text-[11px] text-slate-400 font-sans">
+            Gateway identifies gaps in single CAN arbitration cycle, broadcasts 64-bit bitmap <code class="text-amber-300">0x000000000001c000</code>. ECU retransmits only the 3 missing frames in 1 round.
+          </p>
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>Recovery Rounds: <strong id="pstep-5-rounds" class="text-cyan-300 font-bold">1 Round</strong></span>
+            <span>Retransmitted: <strong id="pstep-5-retrans" class="text-emerald-400 font-bold">3 frames (0 redundant)</strong></span>
+          </div>
+          <div class="text-[10px] text-slate-500 flex justify-between border-t border-slate-800/80 pt-1">
+            <span>NACK Bitmap: <strong id="pstep-5-bitmap" class="text-amber-300 font-mono">0x000000000001c000</strong></span>
+            <span>Turnaround: <strong id="pstep-5-turnaround" class="text-cyan-300 font-mono">~203.8 µs</strong></span>
+          </div>
+        </div>
+
+        <!-- Step 6: Gateway Verification & Active K_session -->
+        <div id="pstep-6" class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span> 6. ML-DSA Verification & Active Session Grant
+            </span>
+            <span id="badge-pstep-6" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">STANDBY</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-sans">
+            Gateway decrypts Ascon AEAD, verifies ML-DSA signature against public key (1,312B). Derives operational session key $K_{\text{session}}$ for Phase B.
+          </p>
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>Verify Latency: <strong class="text-emerald-400">~22.14 ms</strong></span>
+            <span>K_session: <strong class="text-cyan-300">2d7579deac1d5349...</strong></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ========================================================================= -->
+  <!-- 3. PHASE B: OPERATIONAL TELEMETRY STREAMING & COMPLETE 3-TIER IDS GATEWAY -->
+  <!-- ========================================================================= -->
+  <section class="glass-panel p-4 lg:p-5 flex flex-col gap-4 border-t-2 border-t-emerald-500">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+      <div>
+        <h2 class="text-base font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+          <span>Phase B: Operational Telemetry Streaming & 3-Tier IDS Defense</span>
+          <span class="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-mono">Category 1 CAN-FD (100 Hz Bus Clock)</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5 font-mono">
+          3,000 Frames Encrypted under $K_{\text{session}}$ through Tier 1 (&lt;15 µs), Tier 1.5 (&lt;50 µs), and Tier 2 (~270 µs) ONNX INT8 Autoencoder
+        </p>
+      </div>
+
+      <!-- Cycle Duration Info -->
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <span class="text-slate-400">Dataset:</span>
+        <span class="px-2.5 py-1 rounded bg-slate-900 text-cyan-400 border border-slate-700 font-bold">
+          3,000 Canonical Driving Frames (30.0s)
+        </span>
+      </div>
+    </div>
+
+    <!-- ********************************************************************* -->
+    <!-- STREAMING CONTROL BAR PLACED DIRECTLY IN 3-TIER IDS SECTION           -->
+    <!-- ********************************************************************* -->
+    <!-- STREAM STATUS & INSTANT EPISODE JUMPER -->
+    <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulse-dot"></span>
+        <span class="text-slate-400 font-bold uppercase tracking-wider">CAN-FD Ingress Stream:</span>
+        <span class="text-slate-200">100.0 Hz Physical Bus Timing (10 ms Period)</span>
+      </div>
+
+      <!-- Instant Attack Episode Jumper Dropdown -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-slate-400 font-bold">Jump to Episode:</span>
+        <select id="select-episode" class="bg-slate-900 border border-slate-700 text-cyan-300 rounded px-3 py-1.5 font-mono focus:outline-none focus:border-cyan-400 text-xs">
+          <option value="0">WARMUP (Cruising 0–329)</option>
+          <option value="250">Tier 1: AT-01 Tag Corruption (Frame 250)</option>
+          <option value="255">Tier 1: AT-04 Counter Replay (Frame 255)</option>
+          <option value="260">Tier 1: AT-06 20 kHz Flood (Frame 260)</option>
+          <option value="270">Tier 1.5: AT-12 Reverse Gear at Speed (Frame 270)</option>
+          <option value="280">Tier 1.5: AT-14 Wheels Stalled at Speed (Frame 280)</option>
+          <option value="290">Tier 1.5: AT-15 Brake+Throttle Conflict (Frame 290)</option>
+          <option value="330">Tier 2: EP1 Speedometer Masquerade (AT-17)</option>
+          <option value="664">Tier 2: EP2 Wheel Speed LOO Anomaly (AT-18)</option>
+          <option value="998">Tier 2: EP3 Coolant Temp Spike (AT-19)</option>
+          <option value="1332">Tier 1.5: EP4 All Wheels Stalled (AT-14)</option>
+          <option value="1666">Tier 2: EP5 Boiling Frog Drift (AT-22)</option>
+          <option value="2000">Tier 2: EP6 4-Wheel Symmetric LOO (AT-23)</option>
+          <option value="2334">Tier 2: EP7 Window Boundary Poisoning (AT-24)</option>
+          <option value="2667">Tier 2: EP8 Stateful Preconditioning (AT-27)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- MAIN DUAL-PANE MONITORING GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+      <!-- LEFT COLUMN: 3-TIER GATEWAY DECISION PIPELINE (5 COLS) -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+
+        <!-- 3-TIER DECISION HUD -->
+        <div class="glass-panel p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+              <span>3-Tier Gateway Ingress Engine</span>
+              <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-mono">&lt; 340 µs Total</span>
+            </h3>
+            <span id="current-frame-id" class="text-xs font-mono text-slate-400">Frame: #0000</span>
+          </div>
+
+          <!-- Tier 1: Wire Firewall -->
+          <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col gap-1.5 transition-all" id="card-tier1">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                <span class="text-xs font-bold font-mono text-slate-200">TIER 1: Deterministic Wire Firewall (&lt;15 µs)</span>
+              </div>
+              <span id="badge-tier1" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                PASS
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-mono">
+              Checks: IFAT (&ge;0.5ms) • Monotonic Counter (c_t &gt; c_{t-1}) • Ascon Tag (16B)
+            </p>
+            <div id="tier1-status-detail" class="text-[10px] font-mono text-slate-500">
+              Nominal wire reception. All tags and counters fresh.
+            </div>
+          </div>
+
+          <!-- Tier 1.5: Discrete Physical Invariants -->
+          <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col gap-1.5 transition-all" id="card-tier15">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                <span class="text-xs font-bold font-mono text-slate-200">TIER 1.5: Physical Invariant Gate (&lt;50 µs)</span>
+              </div>
+              <span id="badge-tier15" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                PASS
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-mono">
+              Checks: Reverse at Speed • All Wheels Stalled • Brake+Throttle Conflict • DTC
+            </p>
+            <div id="tier15-status-detail" class="text-[10px] font-mono text-slate-500">
+              Physical invariants validated. Vehicle kinematics within nominal envelope.
+            </div>
+          </div>
+
+          <!-- Tier 2: Kinematic Manifold Autoencoder -->
+          <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col gap-2 transition-all" id="card-tier2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+                <span class="text-xs font-bold font-mono text-slate-200">TIER 2: ONNX INT8 Autoencoder (~270 µs)</span>
+              </div>
+              <span id="badge-tier2" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                NORMAL
+              </span>
+            </div>
+
+            <!-- Dynamic Z-Score Bars with Live Values -->
+            <div class="space-y-1.5 mt-1 font-mono text-[11px]">
+              <div>
+                <div class="flex justify-between text-slate-400">
+                  <span>Subsystem 208 (Speedometer):</span>
+                  <span id="val-z-208" class="text-cyan-300">0.42 / 3.70</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div id="bar-z-208" class="bg-cyan-400 h-full transition-all duration-75" style="width: 11%;"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-slate-400">
+                  <span>Subsystem 1760 (Wheel LOO):</span>
+                  <span id="val-z-1760" class="text-cyan-300">0.68 / 5.08</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div id="bar-z-1760" class="bg-cyan-400 h-full transition-all duration-75" style="width: 13%;"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-slate-400">
+                  <span>Subsystem 1255 (Coolant Temp):</span>
+                  <span id="val-z-1255" class="text-cyan-300">0.12 / 2.73</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div id="bar-z-1255" class="bg-cyan-400 h-full transition-all duration-75" style="width: 5%;"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-slate-400">
+                  <span class="font-bold text-white">Global Multivariable Z-Score:</span>
+                  <span id="val-z-glob" class="text-emerald-400 font-bold">0.51 / 3.70</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-1">
+                  <div id="bar-z-glob" class="bg-emerald-400 h-full transition-all duration-75" style="width: 14%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- DEFENSE METRICS COUNTER SUMMARY -->
+        <div class="grid grid-cols-4 gap-2 text-center font-mono">
+          <div class="p-2.5 rounded bg-slate-900 border border-slate-800">
+            <div class="text-[9px] text-slate-500 uppercase">Frames</div>
+            <div id="count-total-frames" class="text-sm font-bold text-white">0</div>
+          </div>
+          <div class="p-2.5 rounded bg-slate-900 border border-slate-800">
+            <div class="text-[9px] text-slate-500 uppercase">Tier 1 Drops</div>
+            <div id="count-tier1-drops" class="text-sm font-bold text-cyan-400">0</div>
+          </div>
+          <div class="p-2.5 rounded bg-slate-900 border border-slate-800">
+            <div class="text-[9px] text-slate-500 uppercase">Tier 1.5 Drops</div>
+            <div id="count-tier15-drops" class="text-sm font-bold text-amber-400">0</div>
+          </div>
+          <div class="p-2.5 rounded bg-slate-900 border border-slate-800">
+            <div class="text-[9px] text-slate-500 uppercase">Steady FPR</div>
+            <div id="val-steady-fpr" class="text-sm font-bold text-emerald-400">0.00%</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: COCKPIT GAUGES + DYNAMIC TIME-SERIES CHARTS (7 COLS) -->
+      <div class="lg:col-span-7 flex flex-col gap-4">
+
+        <!-- VEHICLE COCKPIT TELEMETRY INSTRUMENT CLUSTER -->
+        <div class="glass-panel p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+              <span>Vehicle Kinematics Cluster</span>
+              <span id="active-episode-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-cyan-300">
+                WARMUP (Cruising)
+              </span>
+            </h3>
+            <span class="text-xs font-mono text-slate-400" id="sim-clock-display">00:00.000</span>
+          </div>
+
+          <!-- Instruments Row -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <!-- Speedometer -->
+            <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col items-center">
+              <span class="text-[9px] font-mono text-slate-500 uppercase">Vehicle Speed</span>
+              <div class="text-2xl font-black font-mono text-cyan-400 mt-0.5">
+                <span id="disp-speed">65.2</span> <span class="text-xs text-slate-500">km/h</span>
+              </div>
+              <div class="text-[9px] font-mono text-slate-400 mt-0.5">CAN 0x208</div>
+            </div>
+
+            <!-- Engine RPM -->
+            <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col items-center">
+              <span class="text-[9px] font-mono text-slate-500 uppercase">Engine RPM</span>
+              <div class="text-2xl font-black font-mono text-purple-400 mt-0.5">
+                <span id="disp-rpm">1840</span> <span class="text-xs text-slate-500">RPM</span>
+              </div>
+              <div class="text-[9px] font-mono text-slate-400 mt-0.5">Gear: <span id="disp-gear" class="text-slate-200">D</span></div>
+            </div>
+
+            <!-- Coolant Temp -->
+            <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col items-center">
+              <span class="text-[9px] font-mono text-slate-500 uppercase">Coolant Temp</span>
+              <div class="text-2xl font-black font-mono text-amber-400 mt-0.5">
+                <span id="disp-coolant">88.5</span> <span class="text-xs text-slate-500">°C</span>
+              </div>
+              <div class="text-[9px] font-mono text-slate-400 mt-0.5">CAN 0x1255</div>
+            </div>
+
+            <!-- Steering & Pedals -->
+            <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col justify-center gap-1 text-[10px] font-mono">
+              <div class="flex justify-between">
+                <span class="text-slate-500">Steering:</span>
+                <span id="disp-steer" class="text-slate-300">0.0°</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500">Brake:</span>
+                <span id="disp-brake" class="text-cyan-300">0 kPa</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500">Throttle:</span>
+                <span id="disp-throttle" class="text-cyan-300">18%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4-Wheel Speed LOO Radar & Comparison -->
+          <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex flex-col gap-1.5">
+            <div class="flex justify-between items-center text-xs font-mono">
+              <span class="text-slate-400 font-bold">4-Wheel Independent Speed Channels (CAN ID 0x1760):</span>
+              <span class="text-[10px] text-slate-500">Leave-One-Out (LOO) Invariant Active</span>
+            </div>
+
+            <div class="grid grid-cols-4 gap-2 text-center font-mono text-xs">
+              <div class="p-1.5 rounded bg-slate-950 border border-slate-800">
+                <div class="text-[9px] text-slate-500">Front Left (FL)</div>
+                <div id="disp-wheel-fl" class="font-bold text-slate-200 mt-0.5">65.2 km/h</div>
+              </div>
+              <div class="p-1.5 rounded bg-slate-950 border border-slate-800">
+                <div class="text-[9px] text-slate-500">Front Right (FR)</div>
+                <div id="disp-wheel-fr" class="font-bold text-slate-200 mt-0.5">65.3 km/h</div>
+              </div>
+              <div class="p-1.5 rounded bg-slate-950 border border-slate-800">
+                <div class="text-[9px] text-slate-500">Rear Left (RL)</div>
+                <div id="disp-wheel-rl" class="font-bold text-slate-200 mt-0.5">65.1 km/h</div>
+              </div>
+              <div class="p-1.5 rounded bg-slate-950 border border-slate-800">
+                <div class="text-[9px] text-slate-500">Rear Right (RR)</div>
+                <div id="disp-wheel-rr" class="font-bold text-slate-200 mt-0.5">65.2 km/h</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- REAL-TIME TIME-SERIES OSCILLOSCOPE CANVAS -->
+        <div class="glass-panel p-4 flex flex-col gap-2 flex-1 min-h-[260px]">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+              <span>Dynamic Kinematic Z-Score Oscilloscope</span>
+              <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-mono">60-Frame Sliding Window</span>
+            </h3>
+            <div class="flex items-center gap-3 text-[11px] font-mono">
+              <span class="flex items-center gap-1 text-cyan-400"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> Global Z</span>
+              <span class="flex items-center gap-1 text-red-400"><span class="w-2 h-2 rounded-full bg-red-400"></span> Threshold (3.70)</span>
+              <span class="flex items-center gap-1 text-purple-400"><span class="w-2 h-2 rounded-full bg-purple-400"></span> Wheel LOO</span>
+            </div>
+          </div>
+
+          <div class="relative w-full flex-1 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center min-h-[170px]">
+            <canvas id="oscilloscope-canvas" class="w-full h-full block"></canvas>
+            <div id="attack-banner" class="hidden absolute top-3 px-4 py-1 rounded bg-red-600/90 text-white font-mono font-black tracking-widest text-xs uppercase animate-bounce glow-red">
+              ATTACK DETECTED: KINEMATIC MANIFOLD ANOMALY
+            </div>
+          </div>
+
+          <!-- YOUTUBE-STYLE PLAYBACK CONTROLLER DECK AT BOTTOM OF OSCILLOSCOPE -->
+          <div class="p-3 bg-slate-950/90 rounded-lg border border-slate-800 flex flex-col gap-2 font-mono">
+            
+            <!-- 1. YouTube-Style Scrubbing Timeline & Chapter Markers -->
+            <div class="flex flex-col gap-1">
+              <div class="relative w-full flex items-center">
+                <input id="timeline-scrubber" type="range" min="0" max="3000" value="0" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none">
+              </div>
+              <div class="flex justify-between text-[10px] text-slate-500">
+                <span id="scrubber-time">00:00.000 / 00:30.000</span>
+                <span id="scrubber-frame">Frame: #0000 / 3000</span>
+                <span class="text-cyan-400 cursor-pointer hover:underline" id="btn-scrub-reset">↺ Rewind to Start</span>
+              </div>
+            </div>
+
+            <!-- 2. Media Controls & Speed Row -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/80 text-xs">
+              
+              <!-- Left: Play/Pause, Step Back, Step Forward, Fast Reverse/Forward -->
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <!-- Play / Pause -->
+                <button id="btn-yt-play" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-md transition flex items-center gap-1 text-xs shadow-md shadow-cyan-900/40">
+                  <span id="yt-play-icon">▶</span>
+                  <span id="yt-play-text">Play</span>
+                </button>
+                
+                <!-- Fast Reverse (-1s / 100 frames) -->
+                <button id="btn-yt-rewind" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md transition text-xs" title="Rewind 1 Second (-100 frames)">
+                  ⏪ -1s
+                </button>
+
+                <!-- Single Step Back (-10ms / 1 frame) -->
+                <button id="btn-yt-step-back" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md transition text-xs" title="Step Back (-10 ms)">
+                  ◀ Step
+                </button>
+
+                <!-- Single Step Forward (+10ms / 1 frame) -->
+                <button id="btn-yt-step-fwd" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md transition text-xs" title="Step Forward (+10 ms)">
+                  Step ▶
+                </button>
+
+                <!-- Fast Forward (+1s / 100 frames) -->
+                <button id="btn-yt-fwd" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md transition text-xs" title="Forward 1 Second (+100 frames)">
+                  +1s ⏩
+                </button>
+              </div>
+
+              <!-- Center: Speed Presets (0.1x, 0.2x, 0.5x, 1x, 2x, 3x) -->
+              <div class="flex items-center gap-1 flex-wrap">
+                <span class="text-[11px] text-slate-400 mr-0.5">Speed:</span>
+                <button data-ytspeed="0.1" class="btn-ytspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white text-xs">0.1x</button>
+                <button data-ytspeed="0.2" class="btn-ytspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white text-xs">0.2x</button>
+                <button data-ytspeed="0.5" class="btn-ytspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white text-xs">0.5x</button>
+                <button data-ytspeed="1.0" class="btn-ytspeed px-2 py-1 rounded bg-cyan-900 text-cyan-300 font-bold border border-cyan-700 text-xs">1x</button>
+                <button data-ytspeed="2.0" class="btn-ytspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white text-xs">2x</button>
+                <button data-ytspeed="3.0" class="btn-ytspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white text-xs">3x</button>
+              </div>
+
+              <!-- Right: Manual Speed Control Slider Bar -->
+              <div class="flex items-center gap-1.5 pl-2 border-l border-slate-800">
+                <span class="text-[10px] text-slate-500">Slider:</span>
+                <input id="slider-yt-speed" type="range" min="0.1" max="3.0" step="0.1" value="1.0" class="w-20 accent-cyan-400 cursor-pointer">
+                <span id="slider-yt-val" class="text-[11px] text-cyan-300 font-bold w-10">1.0x</span>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- LIVE CAN-FD BUS WIRE TRAFFIC LOG -->
+        <div class="glass-panel p-3 flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs font-mono border-b border-slate-800 pb-1">
+            <span class="font-bold text-slate-400">CAN-FD Wire Ingress Stream:</span>
+            <span class="text-slate-500 text-[10px]">Encrypted with Ascon-128 AEAD</span>
+          </div>
+          <div id="traffic-log" class="font-mono text-[10px] text-slate-400 space-y-1 max-h-24 overflow-y-auto pr-1">
+            <div>[0.000s] CAN 0x0D0 | Seq 1001 | DLC=64 | DISP: PASS (NOMINAL)</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- 4. DASHBOARD JAVASCRIPT ENGINE                                            -->
+  <!-- ========================================================================= -->
+  <script>
+    // Architecture Parameters
+    const W = 30; // Causal sliding window
+    const TOTAL_FRAMES = 3000;
+    const TAUS = { '208': 3.704, '1760': 5.081, '1255': 2.735, 'global': 3.698 };
+
+    // Episode Definitions matching Canonical Fixture
+    const EPISODES = [
+      { start: 0, end: 329, id: 'WARMUP', label: 'NORMAL', name: 'Nominal Cruising' },
+      { start: 330, end: 423, id: 'EP1_AT17', label: 'ATTACK', name: 'AT-17 Speedometer Masquerade' },
+      { start: 424, end: 663, id: 'RECOVERY_1', label: 'NORMAL', name: 'Window Flush & Recovery 1' },
+      { start: 664, end: 757, id: 'EP2_AT18', label: 'ATTACK', name: 'AT-18 Wheel Speed LOO Anomaly' },
+      { start: 758, end: 997, id: 'RECOVERY_2', label: 'NORMAL', name: 'Window Flush & Recovery 2' },
+      { start: 998, end: 1091, id: 'EP3_AT19', label: 'ATTACK', name: 'AT-19 Coolant Temp Spike' },
+      { start: 1092, end: 1331, id: 'RECOVERY_3', label: 'NORMAL', name: 'Window Flush & Recovery 3' },
+      { start: 1332, end: 1425, id: 'EP4_AT14', label: 'ATTACK', name: 'AT-14 All Wheels Stalled (Tier 1.5)' },
+      { start: 1426, end: 1665, id: 'RECOVERY_4', label: 'NORMAL', name: 'Window Flush & Recovery 4' },
+      { start: 1666, end: 1759, id: 'EP5_AT22', label: 'ATTACK', name: 'AT-22 Boiling Frog Drift' },
+      { start: 1760, end: 1999, id: 'RECOVERY_5', label: 'NORMAL', name: 'Window Flush & Recovery 5' },
+      { start: 2000, end: 2093, id: 'EP6_AT23', label: 'ATTACK', name: 'AT-23 4-Wheel Symmetric LOO' },
+      { start: 2094, end: 2333, id: 'RECOVERY_6', label: 'NORMAL', name: 'Window Flush & Recovery 6' },
+      { start: 2334, end: 2426, id: 'EP7_AT24', label: 'ATTACK', name: 'AT-24 Window Boundary Poisoning' },
+      { start: 2427, end: 2666, id: 'RECOVERY_7', label: 'NORMAL', name: 'Window Flush & Recovery 7' },
+      { start: 2667, end: 2759, id: 'EP8_AT27', label: 'ATTACK', name: 'AT-27 Stateful Preconditioning' },
+      { start: 2760, end: 2999, id: 'RECOVERY_8', label: 'NORMAL', name: 'Window Flush & Recovery 8' }
+    ];
+
+    // Master Orchestration & State Variables
+    let isMasterRunning = false;
+    let masterExecutionMode = 'slow'; // 'slow' or 'realtime'
+    let isPresentationMode = true;
+    let currentIdx = 0;
+    let isStreamPlaying = false;
+    let streamSpeed = 1; // 1 = 100 Hz (10 ms)
+    let streamTimer = null;
+    let autoPauseOnAttack = true;
+    let historyZ = [];
+
+    // Phase A State Variables
+    let phaseAStep = 0;
+    let phaseAPlaying = false;
+    let phaseASpeed = 'slow'; // 'slow', 'medium', 'realtime'
+    let phaseATimer = null;
+    let phaseABitmapNackIssued = false;
+
+    // Build 41-Frame Matrix Blocks
+    const framesGrid = document.getElementById('frames-grid');
+    for (let i = 0; i < 41; i++) {
+      const block = document.createElement('div');
+      block.id = `fblock-${i}`;
+      block.className = 'py-1 rounded bg-slate-800 border border-slate-700 text-slate-400 font-mono transition-all';
+      block.textContent = `#${String(i).padStart(2, '0')}`;
+      framesGrid.appendChild(block);
+    }
+
+    // -------------------------------------------------------------------------
+    // Phase A Noise & Fault Scenarios (Audited against Kunal's Benchmark Report)
+    // -------------------------------------------------------------------------
+    const NOISE_SCENARIOS = {
+      'relay_transient': {
+        id: 'relay_transient',
+        name: 'Inductive Relay Transient Spike',
+        category: 'Canonical Automotive',
+        faultModel: 'BURST_FRAME_DROP',
+        severity: 'BURST (3 FRAMES)',
+        badgeClass: 'bg-amber-950 text-amber-300 border-amber-800',
+        droppedFrames: [14, 15, 16],
+        nackHex: '0x000000000001c000',
+        rounds: 1,
+        retransCount: 3,
+        goodputPct: '86.02%',
+        totalWireFrames: 45,
+        latencyMs: '46.72 ms',
+        desc: 'Inductive relay coil de-energization creates high-voltage flyback transient, corrupting and dropping frames 14, 15, and 16.',
+        step4Desc: 'Payload (2,420B sig + 16B tag = 2,436B) sliced into 41 CAN-FD frames. Physical transient bus noise corrupts and drops frames 14, 15, and 16.',
+        step5Desc: 'Gateway identifies missing frame gap [14, 15, 16], broadcasts 64-bit bitmap <code class="text-amber-300">0x000000000001c000</code>. ECU retransmits only those 3 missing frames in 1 round.',
+        callout4: '<strong class="text-amber-300">Stage 4: CAN-FD Transit with Inductive Relay Spike!</strong> 41 frames sliced (DLC=64). Burst noise drops frames 14, 15, and 16 on the physical wire.',
+        callout5: '<strong class="text-cyan-300">Stage 5: 64-bit Selective Bitmap NACK.</strong> Gateway detects missing [14, 15, 16]. Emits bitmap <code class="text-amber-300">0x0001c000</code>. ECU retransmits only those 3 frames!'
+      },
+      'clean_nominal': {
+        id: 'clean_nominal',
+        name: 'Clean Bus (Nominal)',
+        category: 'Canonical Automotive',
+        faultModel: 'NOMINAL_CLEAN',
+        severity: 'CLEAN (0 DROPS)',
+        badgeClass: 'bg-emerald-950 text-emerald-300 border-emerald-800',
+        droppedFrames: [],
+        nackHex: '0x0000000000000000',
+        rounds: 0,
+        retransCount: 0,
+        goodputPct: '92.84%',
+        totalWireFrames: 41,
+        latencyMs: '54.26 ms',
+        desc: 'Ideal physical CAN-FD bus channel with optimal termination resistance. All 41 frames arrive intact on first pass with zero retransmissions.',
+        step4Desc: 'Payload (2,436B) sliced into 41 CAN-FD frames. Baseline channel with zero physical noise: all 41 frames transmit successfully on first pass.',
+        step5Desc: 'Gateway buffer contains all 41 frames with zero sequence gaps. Bitmap remains <code class="text-emerald-300">0x0000000000000000</code>. No NACK required (0 rounds, 0 retransmissions).',
+        callout4: '<strong class="text-emerald-300">Stage 4: CAN-FD Transit on Nominal Clean Bus.</strong> All 41 frames (DLC=64) arrive intact across wire with 100% first-pass delivery!',
+        callout5: '<strong class="text-emerald-300">Stage 5: Zero Gaps Detected.</strong> Gateway bitmap is 0x00000000. No NACK issued. Immediate progression to signature verification!'
+      },
+      'single_drop': {
+        id: 'single_drop',
+        name: 'Isolated Single Frame Drop',
+        category: 'Canonical Automotive',
+        faultModel: 'SINGLE_FRAME_DROP',
+        severity: 'SINGLE (1 FRAME)',
+        badgeClass: 'bg-blue-950 text-blue-300 border-blue-800',
+        droppedFrames: [12],
+        nackHex: '0x0000000000001000',
+        rounds: 1,
+        retransCount: 1,
+        goodputPct: '90.09%',
+        totalWireFrames: 43,
+        latencyMs: '43.88 ms',
+        desc: 'Single transient voltage glitch on CAN_H line causes frame 12 bit stuff error. Single frame recovered via bit 12 NACK.',
+        step4Desc: 'Payload sliced into 41 frames. Microsecond EMI spike corrupts frame 12 bit-stuffing, dropping only frame 12.',
+        step5Desc: 'Gateway identifies solitary missing frame 12, broadcasts selective bitmap <code class="text-amber-300">0x0000000000001000</code> (bit 12 set). ECU retransmits only frame 12 in 1 round.',
+        callout4: '<strong class="text-blue-300">Stage 4: CAN-FD Transit with Isolated Glitch.</strong> Transient voltage blip corrupts and drops frame 12 on physical bus.',
+        callout5: '<strong class="text-cyan-300">Stage 5: Single Frame Selective NACK.</strong> Gateway broadcasts bit 12 bitmap <code class="text-amber-300">0x00001000</code>. ECU retransmits frame 12 only!'
+      },
+      'late_drop': {
+        id: 'late_drop',
+        name: 'Late-Sequence Frame Drop',
+        category: 'Canonical Automotive',
+        faultModel: 'LATE_SEQUENCE_DROP',
+        severity: 'BOUNDARY (1 FRAME)',
+        badgeClass: 'bg-indigo-950 text-indigo-300 border-indigo-800',
+        droppedFrames: [38],
+        nackHex: '0x0000004000000000',
+        rounds: 1,
+        retransCount: 1,
+        goodputPct: '90.09%',
+        totalWireFrames: 43,
+        latencyMs: '46.20 ms',
+        desc: 'Boundary condition test: frame 38 (near end of 41-frame burst) drops right before burst termination.',
+        step4Desc: 'Payload sliced into 41 frames. Stress-tests late stream boundary conditions by dropping frame 38 at tail end of transmission.',
+        step5Desc: 'Gateway verifies tail boundary, sets bit 38 in 64-bit NACK bitmap (<code class="text-amber-300">0x0000004000000000</code>). ECU retransmits frame 38 in 1 round.',
+        callout4: '<strong class="text-indigo-300">Stage 4: CAN-FD Transit with Late-Sequence Drop.</strong> Frame 38 dropped at tail end of 41-frame burst to verify boundary recovery.',
+        callout5: '<strong class="text-cyan-300">Stage 5: Late Boundary NACK Recovery.</strong> Gateway broadcasts bit 38 bitmap. ECU selectively retransmits frame 38!'
+      },
+      'alternator_burst': {
+        id: 'alternator_burst',
+        name: 'Alternator Commutation Burst',
+        category: 'Canonical Automotive',
+        faultModel: 'BURST_FRAME_DROP',
+        severity: 'SEVERE BURST (8 FRAMES)',
+        badgeClass: 'bg-red-950 text-red-300 border-red-800',
+        droppedFrames: [20, 21, 22, 23, 24, 25, 26, 27],
+        nackHex: '0x000000000ff00000',
+        rounds: 1,
+        retransCount: 8,
+        goodputPct: '77.28%',
+        totalWireFrames: 50,
+        latencyMs: '78.10 ms',
+        desc: 'Severe alternator diode commutation ripple creates sustained 8-frame burst dropout across frames 20 to 27.',
+        step4Desc: 'Payload sliced into 41 frames. Heavy alternator commutation electromagnetic noise obliterates 8 consecutive frames [20, 21, 22, 23, 24, 25, 26, 27].',
+        step5Desc: 'Gateway identifies contiguous 8-frame loss, broadcasts 64-bit bitmap <code class="text-amber-300">0x000000000ff00000</code>. ECU retransmits all 8 frames in 1 single round without full session reset.',
+        callout4: '<strong class="text-red-400">Stage 4: Severe Alternator Commutation Ripple!</strong> Sustained burst noise obliterates 8 consecutive frames [20..27] on the wire.',
+        callout5: '<strong class="text-cyan-300">Stage 5: 8-Frame Multi-Bit Selective NACK.</strong> Gateway broadcasts 8-bit mask <code class="text-amber-300">0x0ff00000</code>. ECU retransmits frames 20-27 in one burst!'
+      },
+      'payload_bitflip': {
+        id: 'payload_bitflip',
+        name: 'Payload Bit-Flip / CRC Corruption',
+        category: 'Fault Injection & Red Team',
+        faultModel: 'PAYLOAD_BIT_FLIP',
+        severity: 'CORRUPTION (1 FRAME)',
+        badgeClass: 'bg-purple-950 text-purple-300 border-purple-800',
+        droppedFrames: [12],
+        isCorruptedOnly: true,
+        nackHex: '0x0000000000001000',
+        rounds: 1,
+        retransCount: 1,
+        goodputPct: '90.09%',
+        totalWireFrames: 43,
+        latencyMs: '45.12 ms',
+        desc: 'Wire EMI causes single bit-flip inside frame 12 payload. Frame physically arrives at Gateway, but Ascon AEAD integrity tag validation fails and flags it as corrupted.',
+        step4Desc: 'Frame 12 suffers physical bit-flip in transit. Physical layer accepts frame, but Gateway Ascon-128 AEAD tag check fails and marks frame 12 invalid.',
+        step5Desc: 'Gateway treats corrupted frame as missing, broadcasts NACK bitmap <code class="text-amber-300">0x0000000000001000</code>. ECU retransmits pristine frame 12.',
+        callout4: '<strong class="text-purple-300">Stage 4: Physical Payload Bit-Flip Injected!</strong> Frame 12 payload corrupted on wire; Gateway Ascon AEAD rejects invalid tag.',
+        callout5: '<strong class="text-cyan-300">Stage 5: AEAD Corruption NACK Recovery.</strong> Corrupted frame 12 purged; Gateway emits bit 12 NACK; ECU delivers fresh frame 12!'
+      },
+      'nack_drop': {
+        id: 'nack_drop',
+        name: 'NACK Control Frame Drop',
+        category: 'Fault Injection & Red Team',
+        faultModel: 'NACK_CONTROL_FRAME_DROP',
+        severity: 'MULTI-ROUND (2 ROUNDS)',
+        badgeClass: 'bg-rose-950 text-rose-300 border-rose-800',
+        droppedFrames: [12],
+        isNackLoss: true,
+        nackHex: '0x0000000000001000 (R1 Lost ➔ R2 OK)',
+        rounds: 2,
+        retransCount: 1,
+        goodputPct: '88.50%',
+        totalWireFrames: 44,
+        latencyMs: '74.80 ms',
+        desc: 'Adversarial/collision stress test: Frame 12 is dropped, and Round 1 Gateway NACK frame is also lost. Gateway timeout timer fires and Round 2 NACK succeeds.',
+        step4Desc: 'Frame 12 drops on wire. In Stage 5, Round 1 NACK control frame is also lost due to bus arbitration collision, forcing timeout timer recovery.',
+        step5Desc: 'Round 1 NACK lost in transit! Gateway retransmit timeout (T_nack = 20 ms) triggers Round 2 NACK (<code class="text-amber-300">0x00001000</code>), successfully recovering frame 12.',
+        callout4: '<strong class="text-rose-400">Stage 4: CAN-FD Transit with Two-Tier Loss.</strong> Frame 12 dropped; Round 1 Gateway NACK will be subjected to collision loss.',
+        callout5: '<strong class="text-rose-300">Stage 5: Round 1 NACK Dropped ➔ Round 2 Timer Recovery!</strong> Gateway re-issues NACK after 20 ms timeout; frame 12 recovered!'
+      },
+      'monte_carlo_random': {
+        id: 'monte_carlo_random',
+        name: 'Monte Carlo Random Loss (20% Bernoulli)',
+        category: 'Statistical Loss Sweeps',
+        faultModel: 'BERNOULLI_RANDOM',
+        severity: 'RANDOM ~20% LOSS (9 FRAMES)',
+        badgeClass: 'bg-orange-950 text-orange-300 border-orange-800',
+        droppedFrames: [3, 6, 9, 13, 15, 21, 26, 31, 40],
+        nackHex: '0x000001008524a248',
+        rounds: 2,
+        retransCount: 9,
+        goodputPct: '71.15%',
+        totalWireFrames: 55,
+        latencyMs: '71.03 ms',
+        desc: 'Statistical 20% Bernoulli random frame erasure across the 41-frame burst. 9 distributed frames dropped and recovered via multi-frame selective bitmap.',
+        step4Desc: 'Bernoulli random loss model (p = 0.20) randomly erases 9 frames across the 41-frame transmission burst.',
+        step5Desc: 'Gateway identifies 9 distributed frame gaps, generates 64-bit sparse bitmap <code class="text-amber-300">0x000001008524a248</code>. ECU retransmits all 9 missing frames in 2 rounds.',
+        callout4: '<strong class="text-orange-400">Stage 4: Monte Carlo 20% Random Erasure Channel!</strong> 9 frames randomly erased across the 41-frame transmission.',
+        callout5: '<strong class="text-cyan-300">Stage 5: Sparse 64-bit Selective Bitmap NACK.</strong> Gateway broadcasts multi-gap bitmap. ECU retransmits all 9 missing frames!'
+      }
+    };
+
+    let currentNoiseKey = 'relay_transient';
+
+    function applyNoiseScenario(key) {
+      if (!NOISE_SCENARIOS[key]) return;
+      currentNoiseKey = key;
+      const sc = NOISE_SCENARIOS[key];
+
+      // Update Step 4 Card
+      const selectEl = document.getElementById('select-noise-scenario');
+      if (selectEl && selectEl.value !== key) selectEl.value = key;
+
+      const sevBadge = document.getElementById('badge-noise-severity');
+      if (sevBadge) {
+        sevBadge.textContent = sc.severity;
+        sevBadge.className = `text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${sc.badgeClass}`;
+      }
+
+      const p4Desc = document.getElementById('pstep-4-desc');
+      if (p4Desc) p4Desc.innerHTML = sc.step4Desc;
+
+      const p4Targets = document.getElementById('pstep-4-targets');
+      if (p4Targets) {
+        p4Targets.textContent = sc.droppedFrames.length > 0 ? `Frames [${sc.droppedFrames.join(', ')}]` : 'None (Clean Bus)';
+        p4Targets.className = sc.droppedFrames.length > 0 ? 'text-red-400 font-bold font-mono' : 'text-emerald-400 font-bold font-mono';
+      }
+
+      const p4Model = document.getElementById('pstep-4-model');
+      if (p4Model) p4Model.textContent = sc.faultModel;
+
+      const p4Goodput = document.getElementById('pstep-4-goodput');
+      if (p4Goodput) p4Goodput.textContent = sc.goodputPct;
+
+      // Update Step 5 Card
+      const p5Desc = document.getElementById('pstep-5-desc');
+      if (p5Desc) p5Desc.innerHTML = sc.step5Desc;
+
+      const p5Rounds = document.getElementById('pstep-5-rounds');
+      if (p5Rounds) p5Rounds.textContent = `${sc.rounds} Round${sc.rounds === 1 ? '' : 's'}`;
+
+      const p5Retrans = document.getElementById('pstep-5-retrans');
+      if (p5Retrans) p5Retrans.textContent = `${sc.retransCount} frames (${sc.droppedFrames.length === 0 ? 'Nominal' : '0 redundant'})`;
+
+      const p5Bitmap = document.getElementById('pstep-5-bitmap');
+      if (p5Bitmap) p5Bitmap.textContent = sc.nackHex;
+
+      // Update Matrix Grid Header & Legend
+      const gridBadge = document.getElementById('grid-scenario-badge');
+      if (gridBadge) gridBadge.textContent = `${sc.name} (${sc.severity})`;
+
+      const legendDrop = document.getElementById('grid-legend-drop');
+      if (legendDrop) {
+        legendDrop.innerHTML = `<span class="w-2 h-2 rounded ${sc.faultModel === 'PAYLOAD_BIT_FLIP' ? 'bg-purple-500' : 'bg-red-500'}"></span> ${sc.faultModel === 'PAYLOAD_BIT_FLIP' ? 'Corrupted' : 'Injected Drop'} ${sc.droppedFrames.length > 0 ? ('[' + sc.droppedFrames.join(', ') + ']') : '(None)'}`;
+      }
+
+      // Update Quick Pill button active styles
+      document.querySelectorAll('.noise-pill-btn').forEach(btn => {
+        if (btn.getAttribute('data-scenario') === key) {
+          btn.className = 'noise-pill-btn px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-bold border border-amber-400 text-[10px] transition-all';
+        } else {
+          btn.className = 'noise-pill-btn px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-400 border border-slate-800 text-[10px] transition-all';
+        }
+      });
+
+      // Reset matrix blocks if Phase A is not running or done
+      if (!phaseAPlaying) {
+        resetPhaseA();
+      }
+    }
+
+    // =========================================================================
+    // PHASE A GRAPHICAL VISUAL ENGINE & ANIMATED CANVAS
+    // =========================================================================
+    const pCanvas = document.getElementById('phasea-canvas');
+    const pCtx = pCanvas.getContext('2d');
+    let pParticles = [];
+
+    function resizePCanvas() {
+      pCanvas.width = pCanvas.parentElement.clientWidth;
+      pCanvas.height = pCanvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizePCanvas);
+    resizePCanvas();
+
+    // Particle Animation for Bus Wire
+    function updatePCanvas() {
+      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+      // Draw Wire Bus Line
+      const yMid = pCanvas.height / 2;
+      pCtx.strokeStyle = '#1e293b';
+      pCtx.lineWidth = 4;
+      pCtx.beginPath();
+      pCtx.moveTo(80, yMid);
+      pCtx.lineTo(pCanvas.width - 80, yMid);
+      pCtx.stroke();
+
+      // Bus Glow
+      pCtx.strokeStyle = '#00f0ff22';
+      pCtx.lineWidth = 12;
+      pCtx.beginPath();
+      pCtx.moveTo(80, yMid);
+      pCtx.lineTo(pCanvas.width - 80, yMid);
+      pCtx.stroke();
+
+      // Render Active Transit Packets
+      for (let i = pParticles.length - 1; i >= 0; i--) {
+        let p = pParticles[i];
+        p.x += p.vx;
+
+        // Draw Packet
+        pCtx.fillStyle = p.color;
+        pCtx.shadowColor = p.color;
+        pCtx.shadowBlur = 10;
+        pCtx.beginPath();
+        pCtx.arc(p.x, yMid, p.radius, 0, Math.PI * 2);
+        pCtx.fill();
+        pCtx.shadowBlur = 0;
+
+        // Text label on packet
+        if (p.label) {
+          pCtx.fillStyle = '#ffffff';
+          pCtx.font = '9px JetBrains Mono';
+          pCtx.fillText(p.label, p.x - 8, yMid - 10);
+        }
+
+        // Check if dropped
+        if (p.isDropped && p.x > pCanvas.width * 0.45 && p.x < pCanvas.width * 0.55) {
+          // Draw Glitch Explosion
+          pCtx.fillStyle = '#ff3344';
+          pCtx.beginPath();
+          pCtx.arc(p.x, yMid, 14, 0, Math.PI * 2);
+          pCtx.fill();
+          pCtx.fillStyle = '#ffffff';
+          pCtx.font = 'bold 10px JetBrains Mono';
+          pCtx.fillText(p.dropLabel || 'DROP!', p.x - 14, yMid + 24);
+          pParticles.splice(i, 1);
+          continue;
+        }
+
+        // Arrived at Gateway or ECU
+        if (p.vx > 0 && p.x >= pCanvas.width - 85) {
+          pParticles.splice(i, 1);
+        } else if (p.vx < 0 && p.x <= 85) {
+          pParticles.splice(i, 1);
+        }
+      }
+
+      requestAnimationFrame(updatePCanvas);
+    }
+    requestAnimationFrame(updatePCanvas);
+
+    // Phase A Execution Controller
+    const pSteps = [
+      { id: 'pstep-1', name: '1. SRAM-PUF Silicon Reconstruction', durationMs: 2500, fastMs: 80 },
+      { id: 'pstep-2', name: '2. HKDF Ephemeral Bootstrap Key', durationMs: 2200, fastMs: 20 },
+      { id: 'pstep-3', name: '3. NIST FIPS 204 ML-DSA-44 Signing', durationMs: 2800, fastMs: 35 },
+      { id: 'pstep-4', name: '4. 41-Frame Transit & Burst Drop', durationMs: 3200, fastMs: 40 },
+      { id: 'pstep-5', name: '5. 64-bit Selective Bitmap NACK Recovery', durationMs: 3000, fastMs: 30 },
+      { id: 'pstep-6', name: '6. Gateway Verification & K_session', durationMs: 2500, fastMs: 25 }
+    ];
+
+    function setPStepVisual(stepNum) {
+      phaseAStep = stepNum;
+      
+      // Update sidebar step cards
+      for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById(`pstep-${i}`);
+        const badge = document.getElementById(`badge-pstep-${i}`);
+        if (i < stepNum) {
+          el.className = 'p-2.5 rounded-lg border step-complete transition-all flex flex-col gap-1';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold';
+          badge.textContent = 'DONE';
+        } else if (i === stepNum) {
+          el.className = 'p-2.5 rounded-lg border step-active transition-all flex flex-col gap-1';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold animate-pulse';
+          badge.textContent = 'ACTIVE';
+        } else {
+          el.className = 'p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 transition-all flex flex-col gap-1 opacity-60';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+          badge.textContent = 'STANDBY';
+        }
+      }
+
+      const callout = document.getElementById('phasea-live-callout');
+      const clock = document.getElementById('phasea-clock');
+
+      if (stepNum === 1) {
+        callout.innerHTML = '<strong class="text-cyan-300">Stage 1: Silicon Entropy Reconstruction.</strong> Fuzzy Extractor decoding noisy uninitialized SRAM bitcells. PBKDF2-HMAC-SHA256 executing 100,000 rounds. No keys stored on flash!';
+        clock.textContent = '79.19 ms';
+        // Fire PUF particles from ECU
+        for (let j = 0; j < 15; j++) {
+          pParticles.push({ x: 80 + Math.random() * 20, vx: 0.5 + Math.random() * 0.5, radius: 3, color: '#00f0ff', isDropped: false });
+        }
+      } else if (stepNum === 2) {
+        callout.innerHTML = '<strong class="text-blue-300">Stage 2: HKDF-Extract & Expand.</strong> Gateway Nonce + PUF secret combined. Ephemeral Bootstrap Key K_boot_i derived for Category 2 transport.';
+        clock.textContent = '82.40 ms';
+      } else if (stepNum === 3) {
+        callout.innerHTML = '<strong class="text-purple-300">Stage 3: NIST FIPS 204 Lattice Signing.</strong> Computing Dilithium ML-DSA-44 post-quantum digital signature. Generating 2,420 bytes authenticating silicon identity.';
+        clock.textContent = '109.24 ms';
+      } else if (stepNum === 4) {
+        const sc = NOISE_SCENARIOS[currentNoiseKey] || NOISE_SCENARIOS['relay_transient'];
+        callout.innerHTML = sc.callout4;
+        clock.textContent = sc.latencyMs || '128.50 ms';
+        // Animate 41 frames
+        for (let f = 0; f < 41; f++) {
+          const isTarget = sc.droppedFrames.includes(f);
+          const block = document.getElementById(`fblock-${f}`);
+          setTimeout(() => {
+            if (isTarget) {
+              if (sc.faultModel === 'PAYLOAD_BIT_FLIP') {
+                if (block) block.className = 'py-1 rounded bg-purple-950 border border-purple-600 text-purple-300 font-mono font-bold animate-pulse';
+                pParticles.push({ x: 80, vx: 3.5, radius: 4.5, color: '#c084fc', isDropped: true, dropLabel: 'CRC FAIL!', label: `#${f}` });
+              } else {
+                if (block) block.className = 'py-1 rounded bg-red-950 border border-red-700 text-red-400 font-mono font-bold animate-pulse';
+                pParticles.push({ x: 80, vx: 3.5, radius: 4.5, color: '#ff3344', isDropped: true, dropLabel: 'DROP!', label: `#${f}` });
+              }
+            } else {
+              if (block) block.className = 'py-1 rounded bg-emerald-950 border border-emerald-700 text-emerald-400 font-mono font-bold';
+              pParticles.push({ x: 80, vx: 3.5, radius: 4, color: '#00ff66', isDropped: false, label: `#${f}` });
+            }
+          }, f * 35);
+        }
+      } else if (stepNum === 5) {
+        const sc = NOISE_SCENARIOS[currentNoiseKey] || NOISE_SCENARIOS['relay_transient'];
+        callout.innerHTML = sc.callout5;
+        clock.textContent = '148.90 ms';
+
+        if (sc.droppedFrames.length === 0) {
+          // Nominal Clean: No NACK required, all frames already green
+        } else if (sc.isNackLoss) {
+          // NACK control frame dropped in transit (Round 1) ➔ Round 2 timeout
+          pParticles.push({ x: pCanvas.width - 90, vx: -3.5, radius: 5, color: '#f43f5e', isDropped: true, dropLabel: 'NACK R1 DROP', label: 'NACK_R1' });
+          setTimeout(() => {
+            // Round 2 NACK timer recovers
+            pParticles.push({ x: pCanvas.width - 90, vx: -4.0, radius: 4.5, color: '#00f0ff', isDropped: false, label: 'NACK_R2' });
+            setTimeout(() => {
+              const block = document.getElementById('fblock-12');
+              if (block) block.className = 'py-1 rounded bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono font-bold';
+              pParticles.push({ x: 80, vx: 4.0, radius: 5, color: '#00f0ff', isDropped: false, label: '#12R' });
+            }, 450);
+          }, 700);
+        } else {
+          // Standard selective retransmission
+          const delayStep = sc.droppedFrames.length > 5 ? 70 : 140;
+          sc.droppedFrames.forEach((f, idx) => {
+            setTimeout(() => {
+              const block = document.getElementById(`fblock-${f}`);
+              if (block) block.className = 'py-1 rounded bg-cyan-950 border border-cyan-500 text-cyan-300 font-mono font-bold';
+              pParticles.push({ x: 80, vx: 4.0, radius: 5, color: '#00f0ff', isDropped: false, label: `#${f}R` });
+            }, idx * delayStep);
+          });
+        }
+      } else if (stepNum === 6) {
+        callout.innerHTML = '<strong class="text-emerald-300">Stage 6: Attestation SUCCESS!</strong> ML-DSA signature verified in 22.14 ms. Operational Session Key established: <code class="text-cyan-300">2d7579de...</code>. Gateway ready for Phase B!';
+        clock.textContent = '171.04 ms';
+        document.getElementById('gateway-state-badge').textContent = 'OPERATIONAL (ATTRIBUTED)';
+        document.getElementById('orchestrator-status').textContent = 'PHASE A COMPLETE ➔ STARTING PHASE B';
+      }
+
+      // Update Phase A YouTube-Style Scrubber & Readout
+      const pScrubber = document.getElementById('phasea-scrubber');
+      if (pScrubber) pScrubber.value = stepNum;
+
+      const pStageLabel = document.getElementById('phasea-scrubber-stage');
+      if (pStageLabel) {
+        if (stepNum === 0) pStageLabel.textContent = 'Stage 0/6: Standby';
+        else pStageLabel.textContent = `Stage ${stepNum}/6: ${pSteps[stepNum - 1] ? (pSteps[stepNum - 1].name.split('.')[1] || pSteps[stepNum - 1].name).trim() : 'Active'}`;
+      }
+
+      const pTimeLabel = document.getElementById('phasea-scrubber-time');
+      if (pTimeLabel) pTimeLabel.textContent = `Time: ${clock.textContent} / 171.04 ms`;
+    }
+
+    let phaseASpeedMultiplier = 1.0;
+
+    function setPhaseASpeed(spd) {
+      phaseASpeedMultiplier = spd;
+      const slider = document.getElementById('slider-phasea-speed');
+      const valBadge = document.getElementById('slider-phasea-val');
+      if (slider) slider.value = spd;
+      if (valBadge) valBadge.textContent = spd.toFixed(1) + 'x';
+
+      document.querySelectorAll('.phasea-speed-btn').forEach(btn => {
+        if (parseFloat(btn.getAttribute('data-speed')) === spd) {
+          btn.className = 'phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-cyan-500 text-slate-950 border-cyan-400';
+        } else {
+          btn.className = 'phasea-speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-slate-900 text-slate-400 border-slate-700';
+        }
+      });
+    }
+
+    function setStreamSpeed(spd) {
+      streamSpeed = spd;
+      const slider = document.getElementById('slider-yt-speed');
+      const valBadge = document.getElementById('slider-yt-val');
+      if (slider) slider.value = spd;
+      if (valBadge) valBadge.textContent = spd.toFixed(1) + 'x';
+
+      document.querySelectorAll('.speed-btn').forEach(btn => {
+        if (parseFloat(btn.getAttribute('data-speed')) === spd) {
+          btn.className = 'speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-cyan-500 text-slate-950 border-cyan-400';
+        } else {
+          btn.className = 'speed-btn px-2 py-0.5 rounded text-[11px] font-bold border transition bg-slate-900 text-slate-400 border-slate-700';
+        }
+      });
+
+      if (isStreamPlaying) {
+        clearInterval(streamTimer);
+        let intervalMs = Math.max(2, Math.round(10 / streamSpeed));
+        streamTimer = setInterval(stepPhaseBStream, intervalMs);
+      }
+    }
+
+    function runPhaseAStep() {
+      if (phaseAStep < 6) {
+        setPStepVisual(phaseAStep + 1);
+        if (phaseAPlaying) {
+          let baseDuration = (masterExecutionMode === 'realtime') ? pSteps[phaseAStep - 1].fastMs : pSteps[phaseAStep - 1].durationMs;
+          let delay = Math.max(25, Math.round(baseDuration / phaseASpeedMultiplier));
+          phaseATimer = setTimeout(runPhaseAStep, delay);
+        }
+      } else {
+        pausePhaseA();
+        if (isMasterRunning) {
+          // Hand off to Phase B based on selected Run All mode
+          let handoffDelay = (masterExecutionMode === 'slow') ? 2200 : 400;
+          setTimeout(() => {
+            if (masterExecutionMode === 'slow') {
+              setStreamSpeed(0.25);
+            } else {
+              setStreamSpeed(1.0);
+            }
+            startPhaseBStream();
+          }, handoffDelay);
+        }
+      }
+    }
+
+    function startPhaseA() {
+      phaseAPlaying = true;
+      const playIcon = document.getElementById('phasea-yt-play-icon');
+      const playText = document.getElementById('phasea-yt-play-text');
+      if (playIcon) playIcon.textContent = '⏸';
+      if (playText) playText.textContent = 'Pause';
+      const headerPlayBtn = document.getElementById('btn-phasea-play');
+      if (headerPlayBtn) headerPlayBtn.innerHTML = '<span>⏸ Pause Phase A</span>';
+      runPhaseAStep();
+    }
+
+    function pausePhaseA() {
+      phaseAPlaying = false;
+      const playIcon = document.getElementById('phasea-yt-play-icon');
+      const playText = document.getElementById('phasea-yt-play-text');
+      if (playIcon) playIcon.textContent = '▶';
+      if (playText) playText.textContent = 'Play';
+      const headerPlayBtn = document.getElementById('btn-phasea-play');
+      if (headerPlayBtn) headerPlayBtn.innerHTML = '<span>▶ Run Phase A</span>';
+      if (phaseATimer) clearTimeout(phaseATimer);
+    }
+
+    function resetPhaseA() {
+      pausePhaseA();
+      phaseAStep = 0;
+      for (let f = 0; f < 41; f++) {
+        const b = document.getElementById(`fblock-${f}`);
+        if (b) b.className = 'py-1 rounded bg-slate-800 border border-slate-700 text-slate-400 font-mono transition-all';
+      }
+      setPStepVisual(0);
+      document.getElementById('phasea-live-callout').innerHTML = '<span class="font-bold text-white">Stage 0 Ready:</span> Click "Run Phase A" or "Run Complete Simulation" to watch silicon PUF reconstruction.';
+      document.getElementById('phasea-clock').textContent = '0.00 ms';
+      const pTimeLabel = document.getElementById('phasea-scrubber-time');
+      if (pTimeLabel) pTimeLabel.textContent = 'Time: 0.00 ms / 171.04 ms';
+    }
+
+    document.getElementById('btn-phasea-play').addEventListener('click', () => {
+      if (phaseAPlaying) pausePhaseA(); else startPhaseA();
+    });
+    document.getElementById('btn-phasea-step').addEventListener('click', () => {
+      pausePhaseA();
+      if (phaseAStep >= 6) resetPhaseA();
+      setPStepVisual(phaseAStep + 1);
+    });
+    document.getElementById('btn-phasea-reset').addEventListener('click', resetPhaseA);
+
+    // Phase A YouTube Controller Event Listeners
+    const btnPhaseaYtPlay = document.getElementById('btn-phasea-yt-play');
+    if (btnPhaseaYtPlay) {
+      btnPhaseaYtPlay.addEventListener('click', () => {
+        if (phaseAPlaying) pausePhaseA(); else startPhaseA();
+      });
+    }
+
+    const btnPhaseaYtPrev = document.getElementById('btn-phasea-yt-prev');
+    if (btnPhaseaYtPrev) {
+      btnPhaseaYtPrev.addEventListener('click', () => {
+        pausePhaseA();
+        if (phaseAStep > 0) setPStepVisual(phaseAStep - 1);
+      });
+    }
+
+    const btnPhaseaYtNext = document.getElementById('btn-phasea-yt-next');
+    if (btnPhaseaYtNext) {
+      btnPhaseaYtNext.addEventListener('click', () => {
+        pausePhaseA();
+        if (phaseAStep < 6) setPStepVisual(phaseAStep + 1);
+      });
+    }
+
+    const btnPhaseaScrubReset = document.getElementById('btn-phasea-scrub-reset');
+    if (btnPhaseaScrubReset) {
+      btnPhaseaScrubReset.addEventListener('click', resetPhaseA);
+    }
+
+    const phaseaScrubber = document.getElementById('phasea-scrubber');
+    if (phaseaScrubber) {
+      phaseaScrubber.addEventListener('input', (e) => {
+        pausePhaseA();
+        setPStepVisual(parseInt(e.target.value));
+      });
+    }
+
+    document.querySelectorAll('.phasea-speed-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setPhaseASpeed(parseFloat(btn.getAttribute('data-speed')));
+      });
+    });
+
+    const sliderPhaseaSpeed = document.getElementById('slider-phasea-speed');
+    if (sliderPhaseaSpeed) {
+      sliderPhaseaSpeed.addEventListener('input', (e) => {
+        setPhaseASpeed(parseFloat(e.target.value));
+      });
+    }
+
+    document.querySelectorAll('.btn-aspeed').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.btn-aspeed').forEach(x => {
+          x.className = 'btn-aspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white';
+        });
+        b.className = 'btn-aspeed px-2 py-1 rounded bg-cyan-900 text-cyan-300 font-bold border border-cyan-700';
+        phaseASpeed = b.dataset.aspeed;
+        if (phaseASpeed === 'slow') setPhaseASpeed(0.25);
+        else if (phaseASpeed === 'medium') setPhaseASpeed(0.5);
+        else setPhaseASpeed(1.0);
+      });
+    });
+
+    // Noise Scenario Selector Listeners
+    const selectNoiseEl = document.getElementById('select-noise-scenario');
+    if (selectNoiseEl) {
+      selectNoiseEl.addEventListener('change', (e) => {
+        applyNoiseScenario(e.target.value);
+      });
+    }
+
+    document.querySelectorAll('.noise-pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sc = btn.getAttribute('data-scenario');
+        applyNoiseScenario(sc);
+      });
+    });
+
+
+    // =========================================================================
+    // PHASE B: OPERATIONAL TELEMETRY & 3-TIER IDS STREAMING
+    // =========================================================================
+    function getTelemetryFrame(idx) {
+      let ep = EPISODES.find(e => idx >= e.start && idx <= e.end) || EPISODES[0];
+      let t_s = idx * 0.010;
+      
+      let baseSpeed = 65.0 + Math.sin(t_s * 0.5) * 6.0;
+      let baseRpm = 1800 + Math.sin(t_s * 0.5) * 200;
+      let baseCoolant = 88.0 + (t_s * 0.01);
+      let baseBrake = 0.0;
+      let baseThrottle = 18.0 + Math.sin(t_s * 0.5) * 5.0;
+      let gear = 'D (Drive)';
+
+      let fl = baseSpeed + (Math.sin(idx * 0.2) * 0.15);
+      let fr = baseSpeed + (Math.cos(idx * 0.2) * 0.15);
+      let rl = baseSpeed - (Math.sin(idx * 0.2) * 0.15);
+      let rr = baseSpeed - (Math.cos(idx * 0.2) * 0.15);
+
+      let isTier1Drop = false;
+      let isTier15Drop = false;
+      let dropReason = '';
+      let isAttack = false;
+
+      // Tier 1 and 1.5 Targeted Fault Injections
+      if (idx === 250) {
+        isTier1Drop = true;
+        dropReason = 'AT-01: Ascon Tag Corruption (Single-Bit Tamper)';
+      } else if (idx === 255) {
+        isTier1Drop = true;
+        dropReason = 'AT-04: Monotonic Counter Replay Attack';
+      } else if (idx === 260) {
+        isTier1Drop = true;
+        dropReason = 'AT-06: 20 kHz Line-Rate Flood (IFAT < 0.5 ms)';
+      } else if (idx === 270) {
+        isTier15Drop = true;
+        gear = 'R (Reverse)';
+        dropReason = 'AT-12: Reverse Gear Engaged at Highway Velocity';
+      } else if (idx === 280) {
+        isTier15Drop = true;
+        fl = 0; fr = 0;
+        dropReason = 'AT-14: Wheel Speeds Stalled at Highway Velocity';
+      } else if (idx === 290) {
+        isTier15Drop = true;
+        baseBrake = 250.0; baseThrottle = 99.0;
+        dropReason = 'AT-15: Conflicting Full Brake + Max Throttle';
+      }
+
+      // Tier 2 Episodic Anomaly Injections
+      let z208 = 0.4 + Math.random() * 0.3;
+      let z1760 = 0.6 + Math.random() * 0.3;
+      let z1255 = 0.2 + Math.random() * 0.2;
+      let zGlob = 0.5 + Math.random() * 0.3;
+
+      if (ep.id === 'EP1_AT17') {
+        baseSpeed = 110.0; // Masquerade
+        z208 = 4.8 + Math.random() * 0.4;
+        zGlob = 4.2 + Math.random() * 0.3;
+        isAttack = true;
+        dropReason = 'AT-17 Speedometer Masquerade Anomaly';
+      } else if (ep.id === 'EP2_AT18') {
+        fl = 15.0; // Single wheel LOO
+        z1760 = 6.4 + Math.random() * 0.5;
+        zGlob = 4.5 + Math.random() * 0.3;
+        isAttack = true;
+        dropReason = 'AT-18 Single Wheel Speed LOO Invariant Violation';
+      } else if (ep.id === 'EP3_AT19') {
+        baseCoolant = 152.0; // Overheat spike
+        z1255 = 4.9 + Math.random() * 0.3;
+        zGlob = 3.9 + Math.random() * 0.2;
+        isAttack = true;
+        dropReason = 'AT-19 Coolant Temperature Sensor Spike';
+      } else if (ep.id === 'EP4_AT14') {
+        fl = 0; fr = 0; rl = 0; rr = 0;
+        isTier15Drop = true;
+        dropReason = 'INV_03: All Wheels Stalled (Preempted by Tier 1.5)';
+      } else if (ep.id === 'EP5_AT22') {
+        baseSpeed += ((idx - ep.start) * 0.3); // Slow drift
+        zGlob = 2.1 + Math.random() * 0.3;
+        isAttack = false; // Stealthy below threshold
+      } else if (ep.id === 'EP6_AT23') {
+        fl = 350.0; fr = 350.0; rl = 350.0; rr = 350.0; // 4-wheel symmetric
+        zGlob = 5.2 + Math.random() * 0.4;
+        isAttack = true;
+        dropReason = 'AT-23 4-Wheel Symmetric Evasion Breach';
+      } else if (ep.id === 'EP7_AT24') {
+        let pulse = (idx % 10 < 3) ? 60.0 : 0.0;
+        baseSpeed += pulse;
+        zGlob = 4.8 + Math.random() * 0.5;
+        isAttack = true;
+        dropReason = 'AT-24 Window Boundary Poisoning Anomaly';
+      } else if (ep.id === 'EP8_AT27') {
+        zGlob = 4.1 + Math.sin(idx * 0.8) * 1.5;
+        isAttack = zGlob > TAUS.global;
+        dropReason = 'AT-27 Stateful Preconditioning Anomaly';
+      }
+
+      // Latent flush buffer behavior (first 30 frames of recovery)
+      if (ep.id.startsWith('RECOVERY_') && (idx - ep.start) < W) {
+        zGlob = 3.8 - ((idx - ep.start) / W) * 2.8;
+      }
+
+      return {
+        idx, time: t_s, episode: ep, speed: baseSpeed, rpm: baseRpm, coolant: baseCoolant,
+        brake: baseBrake, throttle: baseThrottle, gear, fl, fr, rl, rr,
+        isTier1Drop, isTier15Drop, dropReason, isAttack, z208, z1760, z1255, zGlob
+      };
+    }
+
+    // Phase B UI References
+    const elSpeed = document.getElementById('disp-speed');
+    const elRpm = document.getElementById('disp-rpm');
+    const elCoolant = document.getElementById('disp-coolant');
+    const elSteer = document.getElementById('disp-steer');
+    const elBrake = document.getElementById('disp-brake');
+    const elThrottle = document.getElementById('disp-throttle');
+    const elGear = document.getElementById('disp-gear');
+    const elWheelFL = document.getElementById('disp-wheel-fl');
+    const elWheelFR = document.getElementById('disp-wheel-fr');
+    const elWheelRL = document.getElementById('disp-wheel-rl');
+    const elWheelRR = document.getElementById('disp-wheel-rr');
+    const elClock = document.getElementById('sim-clock-display');
+    const elEpisodeTag = document.getElementById('active-episode-tag');
+    const elFrameId = document.getElementById('current-frame-id');
+
+    const badgeTier1 = document.getElementById('badge-tier1');
+    const badgeTier15 = document.getElementById('badge-tier15');
+    const badgeTier2 = document.getElementById('badge-tier2');
+    const tier1Detail = document.getElementById('tier1-status-detail');
+    const tier15Detail = document.getElementById('tier15-status-detail');
+
+    const valZ208 = document.getElementById('val-z-208');
+    const barZ208 = document.getElementById('bar-z-208');
+    const valZ1760 = document.getElementById('val-z-1760');
+    const barZ1760 = document.getElementById('bar-z-1760');
+    const valZ1255 = document.getElementById('val-z-1255');
+    const barZ1255 = document.getElementById('bar-z-1255');
+    const valZGlob = document.getElementById('val-z-glob');
+    const barZGlob = document.getElementById('bar-z-glob');
+
+    const countFrames = document.getElementById('count-total-frames');
+    const countTier1 = document.getElementById('count-tier1-drops');
+    const countTier15 = document.getElementById('count-tier15-drops');
+    const attackBanner = document.getElementById('attack-banner');
+    const trafficLog = document.getElementById('traffic-log');
+
+    let tier1Count = 0;
+    let tier15Count = 0;
+
+    function renderTelemetryFrame(idx) {
+      const f = getTelemetryFrame(idx);
+
+      // Instruments
+      elSpeed.textContent = f.speed.toFixed(1);
+      elRpm.textContent = Math.round(f.rpm);
+      elCoolant.textContent = f.coolant.toFixed(1);
+      elBrake.textContent = Math.round(f.brake) + ' kPa';
+      elThrottle.textContent = Math.round(f.throttle) + '%';
+      elGear.textContent = f.gear;
+      elWheelFL.textContent = f.fl.toFixed(1) + ' km/h';
+      elWheelFR.textContent = f.fr.toFixed(1) + ' km/h';
+      elWheelRL.textContent = f.rl.toFixed(1) + ' km/h';
+      elWheelRR.textContent = f.rr.toFixed(1) + ' km/h';
+
+      // Timestamps & Headings
+      let mins = Math.floor(f.time / 60);
+      let secs = (f.time % 60).toFixed(3);
+      elClock.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(6, '0')}`;
+      elEpisodeTag.textContent = `${f.episode.id} (${f.episode.name})`;
+      elFrameId.textContent = `Frame: #${String(idx).padStart(4, '0')}`;
+      countFrames.textContent = idx;
+
+      // Tier 1 Firewall Processing
+      if (f.isTier1Drop) {
+        tier1Count++;
+        countTier1.textContent = tier1Count;
+        badgeTier1.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-800 glow-red animate-pulse';
+        badgeTier1.textContent = 'DROP_TIER1';
+        tier1Detail.className = 'text-[10px] font-mono text-red-400 font-bold';
+        tier1Detail.textContent = `REJECTED (<15 µs): ${f.dropReason}`;
+      } else {
+        badgeTier1.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+        badgeTier1.textContent = 'PASS';
+        tier1Detail.className = 'text-[10px] font-mono text-slate-500';
+        tier1Detail.textContent = 'Nominal wire reception. All tags and counters fresh.';
+      }
+
+      // Tier 1.5 Invariant Processing
+      if (f.isTier15Drop) {
+        tier15Count++;
+        countTier15.textContent = tier15Count;
+        badgeTier15.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 animate-pulse';
+        badgeTier15.textContent = 'DROP_TIER1_5';
+        tier1Detail.className = 'text-[10px] font-mono text-amber-400 font-bold';
+        tier1Detail.textContent = `BLOCKED (<50 µs): ${f.dropReason}`;
+      } else {
+        badgeTier15.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+        badgeTier15.textContent = 'PASS';
+        tier15Detail.className = 'text-[10px] font-mono text-slate-500';
+        tier15Detail.textContent = 'Physical invariants validated. Vehicle kinematics within nominal envelope.';
+      }
+
+      // Tier 2 Autoencoder Z-Scores
+      valZ208.textContent = `${f.z208.toFixed(2)} / ${TAUS['208'].toFixed(2)}`;
+      barZ208.style.width = Math.min(100, (f.z208 / 6.0) * 100) + '%';
+      barZ208.className = f.z208 > TAUS['208'] ? 'bg-red-500 h-full' : 'bg-cyan-400 h-full';
+
+      valZ1760.textContent = `${f.z1760.toFixed(2)} / ${TAUS['1760'].toFixed(2)}`;
+      barZ1760.style.width = Math.min(100, (f.z1760 / 8.0) * 100) + '%';
+      barZ1760.className = f.z1760 > TAUS['1760'] ? 'bg-red-500 h-full' : 'bg-purple-400 h-full';
+
+      valZ1255.textContent = `${f.z1255.toFixed(2)} / ${TAUS['1255'].toFixed(2)}`;
+      barZ1255.style.width = Math.min(100, (f.z1255 / 4.0) * 100) + '%';
+      barZ1255.className = f.z1255 > TAUS['1255'] ? 'bg-red-500 h-full' : 'bg-amber-400 h-full';
+
+      valZGlob.textContent = `${f.zGlob.toFixed(2)} / ${TAUS.global.toFixed(2)}`;
+      barZGlob.style.width = Math.min(100, (f.zGlob / 6.0) * 100) + '%';
+      barZGlob.className = f.zGlob > TAUS.global ? 'bg-red-500 h-full' : 'bg-emerald-400 h-full';
+
+      let isTier2Anomaly = (f.z208 > TAUS['208']) || (f.z1760 > TAUS['1760']) || (f.z1255 > TAUS['1255']) || (f.zGlob > TAUS.global);
+      if (isTier2Anomaly && !f.isTier1Drop && !f.isTier15Drop) {
+        badgeTier2.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-800 animate-pulse';
+        badgeTier2.textContent = 'FLAG_TIER2';
+        
+        let attackLabel = 'MASQUERADE';
+        let ep = EPISODES.find(e => idx >= e.start && idx <= e.end);
+        if (ep && ep.label === 'ATTACK') {
+          if (ep.id === 'EP1_AT17') attackLabel = 'MASQUERADE (AT-17)';
+          else if (ep.id === 'EP2_AT18') attackLabel = 'WHEEL SPEED LOO (AT-18)';
+          else if (ep.id === 'EP3_AT19') attackLabel = 'COOLANT TEMP SPIKE (AT-19)';
+          else if (ep.id === 'EP4_AT14') attackLabel = 'WHEELS STALLED (AT-14)';
+          else if (ep.id === 'EP5_AT22') attackLabel = 'BOILING FROG DRIFT (AT-22)';
+          else if (ep.id === 'EP6_AT23') attackLabel = '4-WHEEL SYMMETRIC LOO (AT-23)';
+          else if (ep.id === 'EP7_AT24') attackLabel = 'WINDOW BOUNDARY POISONING (AT-24)';
+          else if (ep.id === 'EP8_AT27') attackLabel = 'STATEFUL PRECONDITIONING (AT-27)';
+          else attackLabel = ep.name.toUpperCase();
+        }
+        attackBanner.textContent = `ATTACK DETECTED: ${attackLabel.toUpperCase()}`;
+        attackBanner.classList.remove('hidden');
+      } else if (f.isTier1Drop || f.isTier15Drop) {
+        badgeTier2.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+        badgeTier2.textContent = 'NORMAL';
+        let dropLabel = f.dropReason ? f.dropReason.toUpperCase() : (f.isTier1Drop ? 'TIER 1 WIRE DROP' : 'TIER 1.5 INVARIANT VIOLATION');
+        attackBanner.textContent = `ATTACK DETECTED: ${dropLabel}`;
+        attackBanner.classList.remove('hidden');
+      } else {
+        badgeTier2.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+        badgeTier2.textContent = 'NORMAL';
+        attackBanner.classList.add('hidden');
+      }
+
+      // Update Oscilloscope History
+      historyZ.push({ z: f.zGlob, zWheel: f.z1760, isAtk: isTier2Anomaly });
+      if (historyZ.length > 60) historyZ.shift();
+      drawOscilloscope();
+
+      // Log Entry in Wire Traffic
+      let dispText = f.isTier1Drop ? 'DROP_TIER1' : (f.isTier15Drop ? 'DROP_TIER1_5' : (isTier2Anomaly ? 'FLAG_TIER2' : 'PASS'));
+      let logEntry = document.createElement('div');
+      logEntry.textContent = `[${f.time.toFixed(3)}s] CAN 0x0D0 | Seq ${1000 + idx} | DLC=64 | DISP: ${dispText}`;
+      if (f.isTier1Drop) logEntry.className = 'text-red-400 font-bold';
+      else if (f.isTier15Drop) logEntry.className = 'text-amber-400 font-bold';
+      else if (isTier2Anomaly) logEntry.className = 'text-purple-400 font-bold';
+      trafficLog.appendChild(logEntry);
+      trafficLog.scrollTop = trafficLog.scrollHeight;
+      if (trafficLog.children.length > 25) trafficLog.removeChild(trafficLog.children[0]);
+
+      // Update YouTube-Style Scrubber & Time Indicator
+      if (timelineScrubber) timelineScrubber.value = idx;
+      if (scrubberTime) scrubberTime.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(6, '0')} / 00:30.000`;
+      if (scrubberFrame) scrubberFrame.textContent = `Frame: #${String(idx).padStart(4, '0')} / 3000`;
+    }
+
+    // Oscilloscope Rendering Canvas
+    const oscCanvas = document.getElementById('oscilloscope-canvas');
+    const oscCtx = oscCanvas.getContext('2d');
+
+    function drawOscilloscope() {
+      oscCanvas.width = oscCanvas.parentElement.clientWidth;
+      oscCanvas.height = oscCanvas.parentElement.clientHeight;
+
+      oscCtx.clearRect(0, 0, oscCanvas.width, oscCanvas.height);
+
+      // Grid Lines
+      oscCtx.strokeStyle = '#141c2c';
+      oscCtx.lineWidth = 1;
+      for (let y = 0; y < oscCanvas.height; y += 25) {
+        oscCtx.beginPath();
+        oscCtx.moveTo(0, y);
+        oscCtx.lineTo(oscCanvas.width, y);
+        oscCtx.stroke();
+      }
+
+      // Threshold Line (Tau = 3.70)
+      const maxZ = 6.0;
+      const tauY = oscCanvas.height - (TAUS.global / maxZ) * oscCanvas.height;
+      oscCtx.strokeStyle = '#ff3344';
+      oscCtx.setLineDash([5, 4]);
+      oscCtx.lineWidth = 1.5;
+      oscCtx.beginPath();
+      oscCtx.moveTo(0, tauY);
+      oscCtx.lineTo(oscCanvas.width, tauY);
+      oscCtx.stroke();
+      oscCtx.setLineDash([]);
+
+      // Draw Z-Score Trajectory
+      if (historyZ.length > 1) {
+        const dx = oscCanvas.width / (60 - 1);
+
+        // Subsystem Wheel LOO Trajectory (Purple)
+        oscCtx.lineWidth = 1.5;
+        for (let i = 0; i < historyZ.length - 1; i++) {
+          const x1 = i * dx;
+          const y1 = oscCanvas.height - (Math.min(maxZ, historyZ[i].zWheel) / maxZ) * oscCanvas.height;
+          const x2 = (i + 1) * dx;
+          const y2 = oscCanvas.height - (Math.min(maxZ, historyZ[i + 1].zWheel) / maxZ) * oscCanvas.height;
+          oscCtx.strokeStyle = '#b026ff66';
+          oscCtx.beginPath();
+          oscCtx.moveTo(x1, y1);
+          oscCtx.lineTo(x2, y2);
+          oscCtx.stroke();
+        }
+
+        // Global Z Trajectory (Cyan or Red when breached)
+        oscCtx.lineWidth = 2.5;
+        for (let i = 0; i < historyZ.length - 1; i++) {
+          const x1 = i * dx;
+          const y1 = oscCanvas.height - (Math.min(maxZ, historyZ[i].z) / maxZ) * oscCanvas.height;
+          const x2 = (i + 1) * dx;
+          const y2 = oscCanvas.height - (Math.min(maxZ, historyZ[i + 1].z) / maxZ) * oscCanvas.height;
+          oscCtx.strokeStyle = historyZ[i + 1].z > TAUS.global ? '#ff3344' : '#00f0ff';
+          oscCtx.beginPath();
+          oscCtx.moveTo(x1, y1);
+          oscCtx.lineTo(x2, y2);
+          oscCtx.stroke();
+        }
+      }
+    }
+    window.addEventListener('resize', drawOscilloscope);
+
+    // =========================================================================
+    // YOUTUBE-STYLE PLAYBACK CONTROLS (AT BOTTOM OF OSCILLOSCOPE)
+    // =========================================================================
+    const btnYtPlay = document.getElementById('btn-yt-play');
+    const ytPlayIcon = document.getElementById('yt-play-icon');
+    const ytPlayText = document.getElementById('yt-play-text');
+    const btnYtRewind = document.getElementById('btn-yt-rewind');
+    const btnYtStepBack = document.getElementById('btn-yt-step-back');
+    const btnYtStepFwd = document.getElementById('btn-yt-step-fwd');
+    const btnYtFwd = document.getElementById('btn-yt-fwd');
+    const timelineScrubber = document.getElementById('timeline-scrubber');
+    const scrubberTime = document.getElementById('scrubber-time');
+    const scrubberFrame = document.getElementById('scrubber-frame');
+    const btnScrubReset = document.getElementById('btn-scrub-reset');
+    const sliderYtSpeed = document.getElementById('slider-yt-speed');
+    const sliderYtVal = document.getElementById('slider-yt-val');
+    const selectEpisode = document.getElementById('select-episode');
+
+    function rebuildOscilloscopeHistory(targetIdx) {
+      historyZ = [];
+      const start = Math.max(0, targetIdx - 60);
+      for (let i = start; i <= targetIdx; i++) {
+        const f = getTelemetryFrame(i);
+        let isTier2Anomaly = (f.z208 > TAUS['208']) || (f.z1760 > TAUS['1760']) || (f.z1255 > TAUS['1255']) || (f.zGlob > TAUS.global);
+        historyZ.push({ z: f.zGlob, zWheel: f.z1760, isAtk: isTier2Anomaly });
+      }
+      drawOscilloscope();
+    }
+
+    function updateYtPlayButtonState() {
+      if (isStreamPlaying) {
+        ytPlayIcon.textContent = '⏸';
+        ytPlayText.textContent = 'Pause';
+        btnYtPlay.className = 'px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-md transition flex items-center gap-1 text-xs shadow-md shadow-amber-900/40';
+      } else {
+        ytPlayIcon.textContent = '▶';
+        ytPlayText.textContent = 'Play';
+        btnYtPlay.className = 'px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-md transition flex items-center gap-1 text-xs shadow-md shadow-cyan-900/40';
+      }
+    }
+
+    function stepStream() {
+      if (currentIdx < TOTAL_FRAMES) {
+        renderTelemetryFrame(currentIdx);
+        currentIdx++;
+      } else {
+        pausePhaseBStream();
+        if (isMasterRunning) {
+          document.getElementById('orchestrator-status').textContent = 'COMPLETE SIMULATION FINISHED (100% SUCCESS)';
+          isMasterRunning = false;
+        }
+      }
+    }
+
+    function startPhaseBStream() {
+      isStreamPlaying = true;
+      updateYtPlayButtonState();
+
+      // streamSpeed is a multiplier (1x = 100 Hz = 10 ms interval)
+      let intervalMs = Math.max(2, Math.round(10 / streamSpeed));
+      if (streamTimer) clearInterval(streamTimer);
+      streamTimer = setInterval(stepStream, intervalMs);
+      document.getElementById('orchestrator-status').textContent = 'STAGE 2/2: STREAMING 100 HZ TELEMETRY';
+    }
+
+    function pausePhaseBStream() {
+      isStreamPlaying = false;
+      updateYtPlayButtonState();
+      if (streamTimer) clearInterval(streamTimer);
+    }
+
+    // Play/Pause button
+    btnYtPlay.addEventListener('click', () => {
+      if (isStreamPlaying) {
+        pausePhaseBStream();
+      } else {
+        startPhaseBStream();
+      }
+    });
+
+    // Scrubber drag / input
+    timelineScrubber.addEventListener('input', (e) => {
+      pausePhaseBStream();
+      currentIdx = parseInt(e.target.value);
+      rebuildOscilloscopeHistory(currentIdx);
+      renderTelemetryFrame(currentIdx);
+    });
+
+    // Reset to start
+    btnScrubReset.addEventListener('click', () => {
+      pausePhaseBStream();
+      currentIdx = 0;
+      tier1Count = 0;
+      tier15Count = 0;
+      countTier1.textContent = '0';
+      countTier15.textContent = '0';
+      trafficLog.innerHTML = '';
+      historyZ = [];
+      renderTelemetryFrame(0);
+    });
+
+    // Fast Rewind (-1s / 100 frames)
+    btnYtRewind.addEventListener('click', () => {
+      pausePhaseBStream();
+      currentIdx = Math.max(0, currentIdx - 100);
+      rebuildOscilloscopeHistory(currentIdx);
+      renderTelemetryFrame(currentIdx);
+    });
+
+    // Step Back (-10ms / 1 frame)
+    btnYtStepBack.addEventListener('click', () => {
+      pausePhaseBStream();
+      currentIdx = Math.max(0, currentIdx - 1);
+      rebuildOscilloscopeHistory(currentIdx);
+      renderTelemetryFrame(currentIdx);
+    });
+
+    // Step Forward (+10ms / 1 frame)
+    btnYtStepFwd.addEventListener('click', () => {
+      pausePhaseBStream();
+      currentIdx = Math.min(TOTAL_FRAMES - 1, currentIdx + 1);
+      rebuildOscilloscopeHistory(currentIdx);
+      renderTelemetryFrame(currentIdx);
+    });
+
+    // Fast Forward (+1s / 100 frames)
+    btnYtFwd.addEventListener('click', () => {
+      pausePhaseBStream();
+      currentIdx = Math.min(TOTAL_FRAMES - 1, currentIdx + 100);
+      rebuildOscilloscopeHistory(currentIdx);
+      renderTelemetryFrame(currentIdx);
+    });
+
+    // Speed Preset Buttons (0.1x, 0.2x, 0.5x, 1x, 2x, 3x)
+    document.querySelectorAll('.btn-ytspeed').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.btn-ytspeed').forEach(x => {
+          x.className = 'btn-ytspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white text-xs';
+        });
+        b.className = 'btn-ytspeed px-2 py-1 rounded bg-cyan-900 text-cyan-300 font-bold border border-cyan-700 text-xs';
+        let val = parseFloat(b.dataset.ytspeed);
+        streamSpeed = val;
+        sliderYtSpeed.value = val;
+        sliderYtVal.textContent = `${val.toFixed(1)}x`;
+
+        if (isStreamPlaying) {
+          pausePhaseBStream();
+          startPhaseBStream();
+        }
+      });
+    });
+
+    // Manual Speed Slider Bar
+    sliderYtSpeed.addEventListener('input', (e) => {
+      let val = parseFloat(e.target.value);
+      sliderYtVal.textContent = `${val.toFixed(1)}x`;
+      streamSpeed = val;
+
+      document.querySelectorAll('.btn-ytspeed').forEach(x => {
+        if (parseFloat(x.dataset.ytspeed) === val) {
+          x.className = 'btn-ytspeed px-2 py-1 rounded bg-cyan-900 text-cyan-300 font-bold border border-cyan-700 text-xs';
+        } else {
+          x.className = 'btn-ytspeed px-2 py-1 rounded bg-slate-900 text-slate-400 hover:text-white text-xs';
+        }
+      });
+
+      if (isStreamPlaying) {
+        pausePhaseBStream();
+        startPhaseBStream();
+      }
+    });
+
+    // Jump to episode dropdown
+    selectEpisode.addEventListener('change', (e) => {
+      pausePhaseBStream();
+      currentIdx = parseInt(e.target.value);
+      rebuildOscilloscopeHistory(currentIdx);
+      renderTelemetryFrame(currentIdx);
+    });
+
+    // =========================================================================
+    // 5. MASTER COMPLETE SIMULATION ORCHESTRATOR (PHASE A ➔ PHASE B)
+    // =========================================================================
+    const btnRunSlow = document.getElementById('btn-run-slow');
+    const btnRunRealtime = document.getElementById('btn-run-realtime');
+    const btnStopAll = document.getElementById('btn-stop-all');
+
+    function executeCompleteSimulation(mode) {
+      masterExecutionMode = mode;
+      isMasterRunning = true;
+
+      if (mode === 'slow') {
+        isPresentationMode = true;
+        phaseASpeed = 'slow';
+        setPhaseASpeed(0.25);
+        setStreamSpeed(0.25); // 0.25x slow-mo for Phase B
+        btnRunSlow.classList.add('ring-2', 'ring-cyan-400');
+        btnRunRealtime.classList.remove('ring-2', 'ring-emerald-400');
+        document.getElementById('orchestrator-status').textContent = 'STAGE 1/2: PHASE A ATTESTATION (SLOWED DEFENSE PACE)';
+      } else {
+        isPresentationMode = false;
+        phaseASpeed = 'realtime';
+        setPhaseASpeed(1.0);
+        setStreamSpeed(1.0); // 100 Hz physical bus timing
+        btnRunRealtime.classList.add('ring-2', 'ring-emerald-400');
+        btnRunSlow.classList.remove('ring-2', 'ring-cyan-400');
+        document.getElementById('orchestrator-status').textContent = 'STAGE 1/2: PHASE A ATTESTATION (REAL-TIME 100 HZ)';
+      }
+
+      resetPhaseA();
+      pausePhaseBStream();
+      currentIdx = 0;
+      rebuildOscilloscopeHistory(0);
+      renderTelemetryFrame(0);
+      startPhaseA();
+    }
+
+    btnRunSlow.addEventListener('click', () => {
+      executeCompleteSimulation('slow');
+    });
+
+    btnRunRealtime.addEventListener('click', () => {
+      executeCompleteSimulation('realtime');
+    });
+
+    btnStopAll.addEventListener('click', () => {
+      isMasterRunning = false;
+      if (btnRunSlow) btnRunSlow.classList.remove('ring-2', 'ring-cyan-400');
+      if (btnRunRealtime) btnRunRealtime.classList.remove('ring-2', 'ring-emerald-400');
+      resetPhaseA();
+      pausePhaseBStream();
+      currentIdx = 0;
+      rebuildOscilloscopeHistory(0);
+      renderTelemetryFrame(0);
+      document.getElementById('orchestrator-status').textContent = 'RESET COMPLETE / READY';
+    });
+
+    // Initial render
+    renderTelemetryFrame(0);
+    setPStepVisual(0);
+  </script>
+
+</body>
+</html>
