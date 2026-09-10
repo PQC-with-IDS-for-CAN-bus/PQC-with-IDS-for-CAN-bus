@@ -25,9 +25,10 @@ class ECU:
         return dict(ready=True, busy=self.busy, result=self.result, run_id=self.log.run_id)
 
     def command(self, path, config):
-        if path != '/prepare' or self.busy:
-            raise RuntimeError('ECU busy or unsupported command')
         with self.lock:
+            if path != '/prepare' or self.busy:
+                raise RuntimeError('ECU busy or unsupported command')
+            self.busy = True
             self.config, self.result, self.key = config, None, None
             self.log.run_id = config['run_id']
             self.log.event('prepared', domain=self.domain)
@@ -37,17 +38,30 @@ class ECU:
         while True:
             try:
                 item = self.can.recv(.1)
-                if item and item[0] == CHALLENGE:
-                    self.busy = True
-                    self.handshake(item[1])
             except socket.timeout:
                 continue
+            if not item or item[0] != CHALLENGE:
+                continue
+            with self.lock:
+                config = self.config
+                permitted = self.busy and config and self.result is None
+            if not permitted:
+                self.log.event('unsolicited_challenge_rejected', domain=self.domain)
+                continue
+            try:
+                header = struct.unpack('>BBBBI', item[1][:8])
+                if header[1:3] != (self.ecu_id, self.domain) or header[4] != config['session_id']:
+                    self.log.event('challenge_rejected', domain=self.domain)
+                    continue
+                self.handshake(item[1])
             except Exception as exc:
                 self.key = None
                 self.result = dict(status='EXECUTION_ERROR', error=str(exc))
                 self.log.event('execution_error', error=str(exc), domain=self.domain)
             finally:
-                self.busy = False
+                if self.result is not None:
+                    with self.lock:
+                        self.busy = False
 
     def handshake(self, challenge_frame):
         if not self.config:
@@ -56,6 +70,7 @@ class ECU:
         if target != self.ecu_id or domain != self.domain:
             self.log.event('challenge_rejected', domain=self.domain)
             return
+        prep_started_ns = time.monotonic_ns()
         challenge, session = ChallengeFrame.parse(challenge_frame, self.ecu_id, session)
         self.key = None
         self.counter = 0
@@ -66,13 +81,15 @@ class ECU:
             secret_key=bytes.fromhex(self.credentials['secret_key']), protocol_version=1,
             ecu_id=self.ecu_id, session_id=session, random_challenge=challenge, measurement_hash=measurement)
         frames = AttestationDeliveryManager.wrap_and_fragment(signature, bootstrap, challenge, self.ecu_id, session)
+        prep_ns = time.monotonic_ns() - prep_started_ns
+        self.log.event('crypto_preparation', domain=self.domain, prep_started_ns=prep_started_ns, prep_ns=prep_ns)
         self.log.event('attestation_created', domain=self.domain, session_id=session,
                        measurement_sha256=measurement.hex(), signature_bytes=len(signature), frames=len(frames))
         for i, frame in enumerate(frames):
             self.can.send(ATTESTATION, frame, round=0, frame_idx=i)
-            time.sleep(self.config.get('frame_gap_ms', 1)/1000)
+            time.sleep(self.config.get('frame_gap_us', 250)/1_000_000)
         last_round = 0
-        deadline = time.monotonic()+self.config.get('ecu_wait_ms', 500)/1000
+        deadline = time.monotonic()+self.config.get('ecu_wait_ms', 50)/1000
         while time.monotonic() < deadline:
             try:
                 item = self.can.recv(max(.001, deadline-time.monotonic()))
@@ -85,7 +102,7 @@ class ECU:
                 if len(payload) != 16:
                     continue
                 kind, ecu, rnd, reserved, sid, bitmap = NACK.unpack(payload)
-                if (kind, ecu, reserved, sid) != (0x13, self.ecu_id, 0, session) or bitmap >> 41 or not last_round < rnd <= 3:
+                if (kind, ecu, reserved, sid) != (0x13, self.ecu_id, 0, session) or bitmap == 0 or bitmap >> 41 or not last_round < rnd <= 3:
                     self.log.event('nack_rejected', domain=self.domain)
                     continue
                 last_round = rnd
@@ -93,22 +110,40 @@ class ECU:
                 for i in range(41):
                     if bitmap & (1 << i):
                         self.can.send(ATTESTATION, frames[i], round=rnd, frame_idx=i)
-                        time.sleep(self.config.get('frame_gap_ms', 1)/1000)
-                deadline = time.monotonic()+self.config.get('ecu_wait_ms', 500)/1000
+                        time.sleep(self.config.get('frame_gap_us', 250)/1_000_000)
+                deadline = time.monotonic()+self.config.get('ecu_wait_ms', 50)/1000
             elif can_id == KEY:
                 if len(payload) != 64 or payload[1] != 0xff or payload[2] != self.domain:
                     self.log.event('key_header_rejected', domain=self.domain)
                     continue
                 self.key = KeyDeliveryFrame.unwrap(payload, bootstrap, session)
-                self.result = dict(status='SUCCESS', session_id=session, nack_rounds=last_round)
+                self.result = dict(status='SUCCESS', session_id=session, nack_rounds=last_round, prep_ns=prep_ns, prep_started_ns=prep_started_ns)
                 self.log.event('session_activated', domain=self.domain, session_id=session)
                 self.counter += 1
                 header = DIAG_HEADER.pack(0x1f, self.ecu_id, self.domain, 0x40, self.counter)
                 # Actual file hash + actual monotonic clock; never invented vehicle signals.
                 data = measurement + time.monotonic_ns().to_bytes(8, 'big')
-                nonce = self.counter.to_bytes(4, 'big')+b'\0'*12
+                nonce = SessionManager.derive_runtime_nonce(self.ecu_id, self.domain, self.counter, direction=0)
                 ciphertext, tag = AsconAEAD128Engine.encrypt(self.key, nonce, data, header)
                 self.can.send(DIAGNOSTIC, header+ciphertext+tag, counter=self.counter)
+                if self.config.get('telemetry'):
+                    self.send_telemetry()
                 return
-        self.result = dict(status='ERR_TIMEOUT_NACK_WAIT', session_id=session, nack_rounds=last_round)
+        self.result = dict(status='ERR_TIMEOUT_NACK_WAIT', session_id=session, nack_rounds=last_round, prep_ns=prep_ns, prep_started_ns=prep_started_ns, terminal_ns=time.monotonic_ns())
         self.log.event('ecu_wait_timeout', domain=self.domain, session_id=session, nack_rounds=last_round)
+
+    def send_telemetry(self):
+        from telemetry import load_recording, WIRE
+        samples, provenance = load_recording(Path('/input/telemetry.json'))
+        self.log.event('telemetry_source', domain=self.domain, **provenance)
+        for sample in samples:
+            if self.counter >= 0xffffffff:
+                self.key = None
+                raise RuntimeError('Counter exhausted; new session required')
+            self.counter += 1
+            header = DIAG_HEADER.pack(0x1e, self.ecu_id, self.domain, 0x40, self.counter)
+            data = WIRE.pack(*sample['values'], sample['source_can_id'])
+            nonce = SessionManager.derive_runtime_nonce(self.ecu_id, self.domain, self.counter, direction=0)
+            ciphertext, tag = AsconAEAD128Engine.encrypt(self.key, nonce, data, header)
+            self.can.send(DIAGNOSTIC, header+ciphertext+tag, counter=self.counter)
+            time.sleep(.02)  # Application replay pacing, not original capture timing.

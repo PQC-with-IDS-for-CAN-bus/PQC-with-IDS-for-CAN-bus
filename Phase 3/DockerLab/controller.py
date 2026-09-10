@@ -12,9 +12,12 @@ import time
 import urllib.request
 import uuid
 
-from common import ROOT, atomic
+from common import ROOT, atomic, PostQuantumAttestation
+from evidence import validate_software, export_arrivals
 sys.path.insert(0, str(ROOT / 'Phase 2/Simulation'))
 from contracts import columns, profile, validate
+
+TELEMETRY = False
 
 CANONICAL = [
     ('clean',1,'Clean Bus (Nominal)','NOMINAL_CLEAN',[]),
@@ -47,27 +50,25 @@ def await_ready():
             time.sleep(.2)
 
 
+from event_reader import EventReader
+EVENTS = EventReader()
+
 def read_events():
-    events = []
-    for path in Path('/logs').glob('*/events.jsonl'):
-        for line in path.read_text().splitlines():
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue  # A concurrently written final line will be read next poll.
-    return sorted(events, key=lambda e:e['monotonic_ns'])
+    return EVENTS.read()
 
 
 def execute(domain, scenario, trial, seed):
     mode, sid, name, fault, drops = scenario
     run_id = str(uuid.uuid4())
     config = dict(run_id=run_id, domain=domain, scenario=mode, drops=drops, seed=seed,
-                  frame_gap_ms=1, recovery_timeout_ms=50, ecu_wait_ms=500,
-                  ftti_us=500000, loss_rate=.2)
+                  frame_gap_us=250, recovery_timeout_ms=5, ecu_wait_ms=50,
+                  ftti_us=50000, loss_rate=.2, session_id=int.from_bytes(__import__('os').urandom(4),'big'),
+                  admission_policy='observe' if mode=='clean' and trial==1 else 'enforce',
+                  telemetry=bool(domain==1 and mode=='clean' and trial==1 and TELEMETRY))
     rpc('relay','/configure',config)
     rpc(f'ecu{domain}','/prepare',config)
     rpc('gateway','/run',config)
-    deadline = time.monotonic()+15
+    deadline = time.monotonic()+35
     while True:
         gw = rpc('gateway')['domains'][str(domain)]
         ecu = rpc(f'ecu{domain}')
@@ -97,7 +98,8 @@ def execute(domain, scenario, trial, seed):
         # This is an observed sender timeout without any accepted NACK, not a
         # failure code inferred from a scenario label. Keep both endpoint results.
         status, origin = 'ERR_TIMEOUT_NACK_WAIT','ecu'
-    latency = (result['authenticated_ns']-initial[0]['monotonic_ns'])/1000
+    terminal_ns = ecu['result']['terminal_ns'] if origin=='ecu' else result['authenticated_ns']
+    latency = (terminal_ns-result['started_ns'])/1000
     success = status=='SUCCESS'
     rounds = result['rounds']
     classification = ('RECOVERED_FAULT' if rounds else 'SAFE_TRANSMISSION') if success else (
@@ -106,10 +108,10 @@ def execute(domain, scenario, trial, seed):
     row = dict.fromkeys(columns(), None)
     row.update(run_id=run_id, trial_idx=trial, scenario_id=sid, scenario_name=name, protocol_name='SIXTY_FOUR_BLOCK',
                fault_model=fault, injected_dropped_frame_indices=';'.join(map(str,omitted)) or 'NONE', burst_length=burst,
-               channel_loss_rate_p=.2 if mode=='monte_carlo' else 0., payload_corruption_injected=mode in ('corrupt','malformed'),
+               channel_loss_rate_p=.2 if mode=='monte_carlo' else 0., payload_corruption_injected=mode in ('corrupt','malformed','header_probe'),
                recovery_success=success, recovery_rounds=len(rounds), retransmit_policy='selective_nack_bitmap',
                nack_frames_issued_count=len(rounds), nack_bitmaps_issued_hex=';'.join(r['bitmap'] for r in rounds) or 'N_A',
-               initial_frames_sent=len(initial), retransmitted_frames_count=retransmits, control_frames_count=len(rounds),
+               initial_frames_sent=len(initial), retransmitted_frames_count=retransmits, control_frames_count=len(rounds), total_frames_on_wire=len(data)+len(rounds),
                end_to_end_latency_us=latency, nominal_clean_time_us=0., recovery_overhead_latency_us=0.,
                nack_turnaround_time_us=next(((r['first_rx_ns']-r['tx_ns'])/1000 for r in rounds if 'first_rx_ns' in r),None),
                retry_exhaustion_flag=status=='ERR_RETRY_EXHAUSTION', termination_status_code=status,
@@ -148,7 +150,7 @@ def attack(run_id, name):
 
 def audit(path):
     path = Path(path)
-    errors = validate(path/'fault_recovery_runs.csv', enforce_delivered_requests=False)
+    errors = validate_software(path/'fault_recovery_runs.csv', validate)
     metadata = json.loads((path/'manifest.json').read_text())
     with (path/'fault_recovery_runs.csv').open() as stream:
         rows = list(csv.DictReader(stream))
@@ -157,6 +159,10 @@ def audit(path):
         if hashlib.sha256((path/filename).read_bytes()).hexdigest()!=expected:
             errors.append(f'Hash mismatch: {filename}')
     for row in rows:
+        record = metadata['runs'][row['run_id']]
+        terminal = record['ecu']['terminal_ns'] if record['status_origin']=='ecu' else record['gateway']['authenticated_ns']
+        if float(row['end_to_end_latency_us']) != (terminal-record['gateway']['started_ns'])/1000:
+            errors.append(f'{row["run_id"]}: end-to-end timing mismatch')
         log = [e for e in events if e.get('run_id')==row['run_id']]
         data = [e for e in log if e['node'].startswith('ecu') and e['event']=='tx' and e.get('can_id')=='0x200']
         if len(data)!=int(row['initial_frames_sent'])+int(row['retransmitted_frames_count']):
@@ -184,6 +190,12 @@ def audit(path):
             if sum(e['round']==rnd for e in accepts)!=int(row[f'round_{rnd}_recovered_frames']):
                 errors.append(f'{row["run_id"]}: round {rnd} recovery evidence mismatch')
         if row['recovery_success']=='True':
+            proof = record['gateway'].get('verification_evidence')
+            if not proof or not PostQuantumAttestation.verify_attestation_signature(
+                bytes.fromhex(proof['public_key_hex']), bytes.fromhex(proof['signature_hex']), 1,
+                0x1f+record['domain'], record['gateway']['session_id'], bytes.fromhex(proof['challenge_hex']),
+                bytes.fromhex(proof['measurement_hex'])):
+                errors.append(f'{row["run_id"]}: independent ML-DSA verification failed')
             if len(accepted)!=41:
                 errors.append(f'{row["run_id"]}: incomplete successful assembly')
             auth = [e for e in log if e['event']=='authentication']
@@ -196,8 +208,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--health-only', action='store_true')
     parser.add_argument('--validate-only', action='store_true')
+    parser.add_argument('--telemetry', action='store_true')
     parser.add_argument('--monte-carlo', type=int, default=5)
     args = parser.parse_args()
+    global TELEMETRY
+    TELEMETRY = args.telemetry
     if args.validate_only:
         latest = json.loads(Path('/exports/latest.json').read_text())
         errors = audit(Path('/exports')/latest['directory'])
@@ -208,74 +223,87 @@ def main():
         print('All four ECUs, gateway and relay are ready on SocketCAN.')
         return 0
     import fcntl
-    run_lock = open("/exports/.run.lock", "a")
-    try:
-        fcntl.flock(run_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        raise SystemExit("Another experiment suite is already running.")
-    suite = str(uuid.uuid4())
-    out = Path('/exports')/suite
-    out.mkdir()
-    rows, records, baselines, checks = [], {}, {}, []
-    work = [(d,s,0) for s in CANONICAL for d in range(1,5)]
-    work += [(1,('persistent',2,CANONICAL[1][2],'SINGLE_FRAME_DROP',[12]),0),
-             (1,('nack_drop',2,CANONICAL[1][2],'NACK_CONTROL_FRAME_DROP',[12]),0),
-             (1,('corrupt',1,CANONICAL[0][2],'PAYLOAD_BIT_FLIP',[]),0),
-             (1,('malformed',1,CANONICAL[0][2],'PAYLOAD_BIT_FLIP',[]),0)]
-    work += [(1,('monte_carlo',0,'Monte Carlo Loss Sweep','BERNOULLI_RANDOM',[]),i) for i in range(args.monte_carlo)]
-    work += [(1,CANONICAL[0],1)]  # Fresh session for runtime attacks.
-    for number,(domain,scenario,trial) in enumerate(work):
-        row, record = execute(domain,scenario,trial,20260907+number)
-        if scenario[0]=='clean':
-            baselines[domain]=row
-        row['nominal_clean_time_us']=baselines[domain]['end_to_end_latency_us']
-        row['recovery_overhead_latency_us']=row['end_to_end_latency_us']-row['nominal_clean_time_us']
-        record['baseline_run_id']=baselines[domain]['run_id']
-        records[row['run_id']]=record
-        rows.append(row)
-        expected = {'persistent':'ERR_RETRY_EXHAUSTION','nack_drop':'ERR_TIMEOUT_NACK_WAIT',
-                    'corrupt':'ERR_CRYPTO_TAG_MISMATCH','malformed':'ERR_HEADER_OUT_OF_RANGE'}.get(scenario[0],'SUCCESS')
-        passed = scenario[0]=='monte_carlo' or row['termination_status_code']==expected
-        if scenario in CANONICAL:
-            passed = passed and row['retransmitted_frames_count']==len(scenario[4]) and row['round_1_recovered_frames']==len(scenario[4])
-        if row['recovery_success']:
-            passed = passed and record['gateway']['diagnostic_accepted']>0 and record['ecu']['status']=='SUCCESS'
-        checks.append(dict(run_id=row['run_id'], passed=passed, expected=expected if scenario[0]!='monte_carlo' else 'observational'))
-        print(f'{number+1:02d} {domain} {scenario[0]:12s} {row["termination_status_code"]:28s} {row["end_to_end_latency_us"]:.3f} us',flush=True)
-    attacks = [attack(rows[-1]['run_id'],name) for name in ['replay','forged_tag','spoof_domain','flood']]
-    # Wait for queued flood packets to drain before taking the evidence snapshot.
-    time.sleep(1)
-    events = [e for e in read_events() if e.get('run_id') in records]
-    with (out/'fault_recovery_runs.csv').open('w',newline='') as stream:
-        writer=csv.DictWriter(stream,fieldnames=columns());writer.writeheader();writer.writerows(rows)
-    (out/'events.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events))
-    specs=profile()
-    for name in ('bitrate_regime','nominal_baud','data_baud','total_frames_on_wire','total_wire_bytes','goodput_efficiency_pct'):
-        specs[name]['description']='Unavailable: virtual SocketCAN, no physical CAN controller.'
-    (out/'measurement_profile.json').write_text(json.dumps(specs,indent=2))
-    capture = Path('/captures/candump.log')
-    if capture.exists():
-        (out/'candump_since_lab_start.log').write_bytes(capture.read_bytes())
-    artifacts=['fault_recovery_runs.csv','events.jsonl','measurement_profile.json']
-    if (out/'candump_since_lab_start.log').exists():
-        artifacts.append('candump_since_lab_start.log')
-    metadata=dict(profile='phase2-docker-socketcan-v1', suite=suite, created_epoch_ns=time.time_ns(),
-                  transport='Linux CAN-FD vxcan, independent Docker namespaces; no datagram fallback',
-                  python=sys.version, kernel=platform.release(),
-                  dependencies={name:importlib.metadata.version(name) for name in ('cryptography','dilithium-py')},
-                  container_runtime=json.loads(Path('/runtime.json').read_text()) if Path('/runtime.json').is_file() else None,
-                  runs=records, scenario_checks=checks, attacks=attacks,
-                  strict_phase3_errors=validate(out/'fault_recovery_runs.csv',strict=True,enforce_delivered_requests=False),
-                  sha256={name:hashlib.sha256((out/name).read_bytes()).hexdigest() for name in artifacts},
-                  source_sha256={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest()
-                                 for p in [*Path.cwd().glob('*.py'), *list((ROOT/'Phase 1/CAN FD/Crypto Code').glob('*.py')),
-                                           ROOT/'Phase 3/config/data_contract_schemas.json']})
-    (out/'manifest.json').write_text(json.dumps(metadata,indent=2))
-    errors=audit(out)
-    passed=not errors and all(c['passed'] for c in checks+attacks)
-    atomic('/exports/latest.json',dict(directory=suite, passed=passed, runs=len(rows), attacks=attacks, errors=errors))
-    print(json.dumps(dict(passed=passed, runs=len(rows), attacks=attacks, errors=errors),indent=2))
-    return not passed
+    with open('/exports/.run.lock', 'a') as run_lock:
+        try:
+            fcntl.flock(run_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit('Another experiment suite is already running.')
+        suite = str(uuid.uuid4())
+        out = Path('/exports')/suite
+        out.mkdir()
+        rows, records, baselines, checks = [], {}, {}, []
+        work = [(d,s,0) for s in CANONICAL for d in range(1,5)]
+        work += [(1,('persistent',2,CANONICAL[1][2],'SINGLE_FRAME_DROP',[12]),0),
+                 (1,('nack_drop',2,CANONICAL[1][2],'NACK_CONTROL_FRAME_DROP',[12]),0),
+                 (1,('corrupt',1,CANONICAL[0][2],'PAYLOAD_BIT_FLIP',[]),0),
+                 (1,('malformed',1,CANONICAL[0][2],'PAYLOAD_BIT_FLIP',[]),0),
+                 (1,('header_probe',1,CANONICAL[0][2],'PAYLOAD_BIT_FLIP',[]),0)]
+        work += [(1,('monte_carlo',0,'Monte Carlo Loss Sweep','BERNOULLI_RANDOM',[]),i) for i in range(args.monte_carlo)]
+        work += [(1,CANONICAL[0],1)]  # Fresh session for runtime attacks.
+        for number,(domain,scenario,trial) in enumerate(work):
+            row, record = execute(domain,scenario,trial,20260907+number)
+            if scenario[0]=='clean':
+                baselines[domain]=row
+            row['nominal_clean_time_us']=baselines[domain]['end_to_end_latency_us']
+            row['recovery_overhead_latency_us']=max(0.,row['end_to_end_latency_us']-row['nominal_clean_time_us']) if row['recovery_success'] and row['recovery_rounds'] else 0.
+            record['baseline_run_id']=baselines[domain]['run_id']
+            records[row['run_id']]=record
+            rows.append(row)
+            expected = {'persistent':'ERR_RETRY_EXHAUSTION','nack_drop':'ERR_TIMEOUT_NACK_WAIT',
+                        'corrupt':'ERR_CRYPTO_TAG_MISMATCH','malformed':'ERR_HEADER_OUT_OF_RANGE'}.get(scenario[0],'SUCCESS')
+            passed = scenario[0]=='monte_carlo' or row['termination_status_code']==expected
+            if scenario[0]=='header_probe':
+                passed = passed and row['retransmitted_frames_count']==1 and row['round_1_recovered_frames']==1
+            if scenario in CANONICAL:
+                passed = passed and row['retransmitted_frames_count']==len(scenario[4]) and row['round_1_recovered_frames']==len(scenario[4])
+            if row['recovery_success']:
+                admitted = record['gateway']['within_admission_budget'] or record['config']['admission_policy']=='observe'
+                passed = passed and ((record['gateway']['diagnostic_accepted']>0 and record['ecu']['status']=='SUCCESS') if admitted else (not record['gateway']['key_delivered'] and record['ecu']['status']=='ERR_TIMEOUT_NACK_WAIT'))
+            checks.append(dict(run_id=row['run_id'], passed=passed, expected=expected if scenario[0]!='monte_carlo' else 'observational'))
+            print(f'{number+1:02d} {domain} {scenario[0]:12s} {row["termination_status_code"]:28s} {row["end_to_end_latency_us"]:.3f} us',flush=True)
+        attacks = [attack(rows[-1]['run_id'],name) for name in ['replay','forged_tag','spoof_domain','flood']]
+        # Wait for queued flood packets to drain before taking the evidence snapshot.
+        time.sleep(1)
+        events = [e for e in read_events() if e.get('run_id') in records]
+        with (out/'fault_recovery_runs.csv').open('w',newline='') as stream:
+            writer=csv.DictWriter(stream,fieldnames=columns());writer.writeheader();writer.writerows(rows)
+        (out/'events.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events))
+        specs=profile()
+        for name in ('bitrate_regime','nominal_baud','data_baud','total_wire_bytes','goodput_efficiency_pct'):
+            specs[name]['description']='Unavailable: virtual SocketCAN, no physical CAN controller.'
+        (out/'measurement_profile.json').write_text(json.dumps(specs,indent=2))
+        capture = Path('/captures/candump.log')
+        if capture.exists():
+            (out/'candump_since_lab_start.log').write_bytes(capture.read_bytes())
+        arrivals = export_arrivals(out,events,records)
+        artifacts=['fault_recovery_runs.csv','events.jsonl','measurement_profile.json','tcpdump_latency_summary.csv']
+        if (out/'candump_since_lab_start.log').exists():
+            artifacts.append('candump_since_lab_start.log')
+        import subprocess
+        perf = subprocess.run(['perf','stat','-x,','-e','cycles,instructions','--','true'],capture_output=True,text=True)
+        (out/'perf_probe.txt').write_text(perf.stderr)
+        artifacts.append('perf_probe.txt')
+        metadata=dict(perf_probe=dict(returncode=perf.returncode,
+                      status='AVAILABLE_PROBE_ONLY' if perf.returncode==0 else 'UNAVAILABLE_PERMISSION_OR_PMU',
+                      contract1_complete=False), arrivals=arrivals, profile='phase3-docker-socketcan-v2', suite=suite, created_epoch_ns=time.time_ns(),
+                      transport='Linux CAN-FD vxcan, independent Docker namespaces; no datagram fallback',
+                      python=sys.version, kernel=platform.release(),
+                      dependencies={name:importlib.metadata.version(name) for name in ('cryptography','dilithium-py','onnxruntime','numpy')},
+                      container_runtime=json.loads(Path('/runtime.json').read_text()) if Path('/runtime.json').is_file() else None,
+                      runtime_nonce='Phase 1 SessionManager.derive_runtime_nonce; fresh key per session',
+                      admission_note='50ms experimental budget, not ISO 26262 mandated value; final attack setup explicitly observes rather than enforces budget',
+                      runs=records, scenario_checks=checks, attacks=attacks,
+                      strict_phase3_errors=validate(out/'fault_recovery_runs.csv',strict=True,enforce_delivered_requests=False),
+                      sha256={name:hashlib.sha256((out/name).read_bytes()).hexdigest() for name in artifacts},
+                      source_sha256={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest()
+                                     for p in [*Path.cwd().glob('*.py'), *list((ROOT/'Phase 1/CAN FD/Crypto Code').glob('*.py')),
+                                               ROOT/'Phase 3/config/data_contract_schemas.json']})
+        (out/'manifest.json').write_text(json.dumps(metadata,indent=2))
+        errors=audit(out)
+        passed=not errors and all(c['passed'] for c in checks+attacks)
+        atomic('/exports/latest.json',dict(directory=suite, passed=passed, runs=len(rows), attacks=attacks, errors=errors))
+        print(json.dumps(dict(passed=passed, runs=len(rows), attacks=attacks, errors=errors),indent=2))
+        return not passed
 
 
 if __name__=='__main__':

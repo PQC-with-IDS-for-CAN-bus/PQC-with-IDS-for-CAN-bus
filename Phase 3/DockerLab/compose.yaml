@@ -12,7 +12,7 @@ x-app: &app
   cap_add: [NET_RAW]
   security_opt: [no-new-privileges:true]
   networks: [management]
-  pids_limit: 128
+  pids_limit: 256
   healthcheck:
     test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=2)"]
     interval: 3s
@@ -34,6 +34,7 @@ services:
     environment: {ROLE: ecu, DOMAIN: '1'}
     volumes:
       - ./state/credentials/ecu1.json:/credentials/identity.json:ro
+      - ./state/input:/input:ro
       - ./state/logs/ecu1:/logs/ecu1
   ecu2:
     <<: *app
@@ -82,16 +83,18 @@ services:
       - ./state/runtime.json:/runtime.json:ro
   observer:
     image: pqc-can-lab:local
-    user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
+    user: '0:0'
     command: [python, observer.py]
     init: true
     read_only: true
     cap_drop: [ALL]
-    cap_add: [NET_RAW]
+    cap_add: [NET_RAW, DAC_OVERRIDE, SETUID, SETGID]
     network_mode: service:gateway
     depends_on: [gateway]
     security_opt: [no-new-privileges:true]
-    volumes: [./state/captures:/captures]
+    volumes:
+      - ./state/captures:/captures
+      - ./state/exports:/exports:ro
   dashboard:
     <<: *app
     command: [python, dashboard.py]

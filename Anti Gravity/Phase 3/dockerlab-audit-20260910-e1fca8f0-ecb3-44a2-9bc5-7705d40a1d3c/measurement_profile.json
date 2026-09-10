@@ -1,0 +1,364 @@
+{
+  "run_id": {
+    "type": "string",
+    "description": "Unique trial identifier (UUIDv4 or sequential integer)",
+    "validation": "^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-9]+)$",
+    "nullable": false
+  },
+  "trial_idx": {
+    "type": "uint32",
+    "description": "Sequential trial index within a scenario sweep (0 to N_trials-1)",
+    "validation": {
+      "min": 0
+    },
+    "nullable": false
+  },
+  "scenario_id": {
+    "type": "uint16",
+    "description": "Project-defined test scenario ID (1-5 for canonical scenarios, 0 for Monte Carlo sweeps)",
+    "validation": {
+      "min": 0,
+      "max": 99
+    },
+    "nullable": false
+  },
+  "scenario_name": {
+    "type": "string",
+    "description": "Canonical human-readable scenario name",
+    "enum": [
+      "Clean Bus (Nominal)",
+      "Isolated Single Frame Drop",
+      "Late-Sequence Frame Drop",
+      "Inductive Relay Transient Spike",
+      "Alternator Commutation Burst",
+      "Monte Carlo Loss Sweep"
+    ],
+    "nullable": false
+  },
+  "protocol_name": {
+    "type": "string",
+    "description": "Transport protocol under evaluation",
+    "enum": [
+      "SIXTY_FOUR_BLOCK",
+      "ISO_TP_15765_2",
+      "CASTIGLIONE_NATIVE",
+      "CASTIGLIONE_SCALED"
+    ],
+    "nullable": false
+  },
+  "bitrate_regime": {
+    "type": "string",
+    "description": "Unavailable: virtual SocketCAN, no physical CAN controller.",
+    "enum": [
+      "CASTIGLIONE_1MBPS",
+      "PROD_CANFD_2MBPS",
+      "HIGHPERF_CANFD_5MBPS"
+    ],
+    "nullable": false
+  },
+  "nominal_baud": {
+    "type": "uint32",
+    "unit": "bits_per_second",
+    "validation": {
+      "allowed": [
+        500000,
+        1000000
+      ]
+    },
+    "nullable": false,
+    "description": "Unavailable: virtual SocketCAN, no physical CAN controller."
+  },
+  "data_baud": {
+    "type": "uint32",
+    "unit": "bits_per_second",
+    "validation": {
+      "allowed": [
+        1000000,
+        2000000,
+        5000000
+      ]
+    },
+    "nullable": false,
+    "description": "Unavailable: virtual SocketCAN, no physical CAN controller."
+  },
+  "fault_model": {
+    "type": "string",
+    "description": "Injected fault model classification per ISO 26262-5 Annex D",
+    "enum": [
+      "NOMINAL_CLEAN",
+      "SINGLE_FRAME_DROP",
+      "LATE_SEQUENCE_DROP",
+      "BURST_FRAME_DROP",
+      "GILBERT_ELLIOTT_BURST",
+      "BERNOULLI_RANDOM",
+      "PAYLOAD_BIT_FLIP",
+      "NACK_CONTROL_FRAME_DROP"
+    ],
+    "nullable": false
+  },
+  "injected_dropped_frame_indices": {
+    "type": "string",
+    "description": "Semicolon-delimited list of targeted frame indices (e.g. '14;15;16'), or 'NONE' for clean bus",
+    "validation": "^(NONE|[0-9]+(;[0-9]+)*)$",
+    "nullable": false
+  },
+  "burst_length": {
+    "type": "uint16",
+    "unit": "frames",
+    "description": "Number of consecutive dropped frames in the burst (0 for clean, 1 for single, 3/8 for bursts)",
+    "validation": {
+      "min": 0,
+      "max": 41
+    },
+    "nullable": false
+  },
+  "channel_loss_rate_p": {
+    "type": "float64",
+    "description": "Applied channel loss probability for Monte Carlo sweeps (0.00 for deterministic scenarios)",
+    "validation": {
+      "min": 0.0,
+      "max": 1.0
+    },
+    "nullable": false
+  },
+  "payload_corruption_injected": {
+    "type": "boolean",
+    "description": "Whether a bit-flip was injected into the payload to test Ascon-AEAD128 tag verification failure (separate from frame drop)",
+    "nullable": false
+  },
+  "recovery_success": {
+    "type": "boolean",
+    "description": "High-level session completion flag (True = payload reassembled and cryptographically verified)",
+    "nullable": false
+  },
+  "recovery_rounds": {
+    "type": "uint8",
+    "description": "Number of retransmission cycles executed (0 = clean first-pass, 1-3 for retry rounds)",
+    "validation": {
+      "min": 0,
+      "max": 3
+    },
+    "nullable": false
+  },
+  "retransmit_policy": {
+    "type": "string",
+    "description": "Recovery mechanism type used by the protocol under test",
+    "enum": [
+      "selective_nack_bitmap",
+      "full_sequence_abort",
+      "full_sequence_restart"
+    ],
+    "nullable": false
+  },
+  "nack_frames_issued_count": {
+    "type": "uint8",
+    "description": "Total NACK or Flow Control frames transmitted across all retry rounds",
+    "validation": {
+      "min": 0,
+      "max": 3
+    },
+    "nullable": false
+  },
+  "nack_bitmaps_issued_hex": {
+    "type": "string",
+    "description": "Semicolon-delimited hexadecimal 64-bit NACK bitmaps transmitted per round (e.g. '0x0000000000041000;0x0000000000040000'). Only applicable to SIXTY_FOUR_BLOCK protocol.",
+    "validation": "^(N_A|0x[0-9A-Fa-f]{16}(;0x[0-9A-Fa-f]{16})*)$",
+    "nullable": false
+  },
+  "round_1_requested_frames": {
+    "type": "uint16",
+    "description": "Missing frames requested in Round 1 NACK",
+    "validation": {
+      "min": 0,
+      "max": 41
+    },
+    "nullable": false
+  },
+  "round_1_recovered_frames": {
+    "type": "uint16",
+    "description": "Retransmitted frames successfully received in Round 1",
+    "validation": {
+      "min": 0,
+      "max": 41
+    },
+    "nullable": false
+  },
+  "round_2_requested_frames": {
+    "type": "uint16",
+    "validation": {
+      "min": 0,
+      "max": 41
+    },
+    "nullable": false
+  },
+  "round_2_recovered_frames": {
+    "type": "uint16",
+    "validation": {
+      "min": 0,
+      "max": 41
+    },
+    "nullable": false
+  },
+  "round_3_requested_frames": {
+    "type": "uint16",
+    "validation": {
+      "min": 0,
+      "max": 41
+    },
+    "nullable": false
+  },
+  "round_3_recovered_frames": {
+    "type": "uint16",
+    "validation": {
+      "min": 0,
+      "max": 41
+    },
+    "nullable": false
+  },
+  "initial_frames_sent": {
+    "type": "uint16",
+    "description": "Data frames transmitted in initial burst (41 for 60/4, 39 for ISO-TP, 12 for Castiglione native)",
+    "validation": {
+      "min": 1,
+      "max": 255
+    },
+    "nullable": false
+  },
+  "retransmitted_frames_count": {
+    "type": "uint16",
+    "description": "Total data frames resent across all retry rounds",
+    "validation": {
+      "min": 0
+    },
+    "nullable": false
+  },
+  "control_frames_count": {
+    "type": "uint16",
+    "description": "Total control frames on wire (NACK + Flow Control + Restart NACK)",
+    "validation": {
+      "min": 0
+    },
+    "nullable": false
+  },
+  "total_frames_on_wire": {
+    "type": "uint32",
+    "description": "Total frames put on wire (initial + retransmit + control)",
+    "validation": {
+      "min": 1
+    },
+    "nullable": false
+  },
+  "total_wire_bytes": {
+    "type": "uint32",
+    "unit": "bytes",
+    "description": "Unavailable: virtual SocketCAN, no physical CAN controller.",
+    "validation": {
+      "min": 1
+    },
+    "nullable": false
+  },
+  "goodput_efficiency_pct": {
+    "type": "float64",
+    "unit": "percentage",
+    "description": "Unavailable: virtual SocketCAN, no physical CAN controller.",
+    "validation": {
+      "min": 0.0,
+      "max": 100.0
+    },
+    "nullable": false
+  },
+  "end_to_end_latency_us": {
+    "type": "float64",
+    "unit": "microseconds",
+    "description": "Total elapsed turnaround latency from Frame 0 Tx to complete payload assembly",
+    "validation": {
+      "min": 0.0
+    },
+    "nullable": false
+  },
+  "nominal_clean_time_us": {
+    "type": "float64",
+    "unit": "microseconds",
+    "description": "Theoretical or empirical baseline duration under clean bus (0% loss)",
+    "validation": {
+      "min": 0.0
+    },
+    "nullable": false
+  },
+  "recovery_overhead_latency_us": {
+    "type": "float64",
+    "unit": "microseconds",
+    "description": "Non-negative excess latency incurred by fault recovery strictly >= 0.0 us",
+    "validation": {
+      "min": 0.0
+    },
+    "nullable": false
+  },
+  "nack_turnaround_time_us": {
+    "type": "float64",
+    "unit": "microseconds",
+    "description": "Delay from NACK Tx to receipt of first retransmitted frame",
+    "validation": {
+      "min": 0.0
+    },
+    "nullable": true,
+    "nullable_reason": "Null when no NACK was issued (clean bus or full-abort protocol)"
+  },
+  "retry_exhaustion_flag": {
+    "type": "boolean",
+    "description": "True if maximum retries (K_retry = 3) were exhausted without complete assembly",
+    "nullable": false
+  },
+  "termination_status_code": {
+    "type": "string",
+    "description": "Root-cause failure classification per ISO 26262 audit tree. Replaces ambiguous binary success/fail with actionable diagnostic codes.",
+    "enum": [
+      "SUCCESS",
+      "ERR_RETRY_EXHAUSTION",
+      "ERR_TIMEOUT_NACK_WAIT",
+      "ERR_TIMEOUT_FLOW_CONTROL",
+      "ERR_CRYPTO_TAG_MISMATCH",
+      "ERR_CRYPTO_SIG_INVALID",
+      "ERR_HEADER_OUT_OF_RANGE",
+      "ERR_SOCKET_BUFFER_OVERFLOW",
+      "ERR_BUS_OFF"
+    ],
+    "nullable": false
+  },
+  "iso26262_failure_classification": {
+    "type": "string",
+    "description": "High-level ISO 26262 safety classification of the outcome",
+    "enum": [
+      "SAFE_TRANSMISSION",
+      "RECOVERED_FAULT",
+      "INFORMATION_LOSS_OMISSION",
+      "PROTOCOL_ABORT_TIMEOUT",
+      "CORRUPTED_FRAME_REJECTED"
+    ],
+    "nullable": false
+  },
+  "ftti_budget_us": {
+    "type": "float64",
+    "unit": "microseconds",
+    "description": "Fault Tolerant Time Interval budget from HARA (default 50000 us = 50 ms for ASIL-D boot attestation)",
+    "validation": {
+      "min": 0.0
+    },
+    "nullable": false
+  },
+  "ftti_violation_flag": {
+    "type": "boolean",
+    "description": "True if end_to_end_latency exceeds ftti_budget (safety goal violation)",
+    "nullable": false
+  },
+  "safety_state_achieved": {
+    "type": "string",
+    "description": "Final system safety state after fault handling",
+    "enum": [
+      "OPERATIONAL",
+      "SAFE_FALLBACK",
+      "UNRECOVERED_HAZARD"
+    ],
+    "nullable": false
+  }
+}

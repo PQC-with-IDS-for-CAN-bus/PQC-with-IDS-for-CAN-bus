@@ -61,10 +61,10 @@ class CAN:
     def send(self, can_id, payload, **details):
         if len(payload) not in (16, 64):
             raise ValueError('Lab CAN-FD payload must be 16 or 64 bytes')
-        self.socket.send(CANFD.pack(can_id, len(payload), 0, payload.ljust(64, b'\0')))
+        self.socket.send(CANFD.pack(can_id, len(payload), 1, payload.ljust(64, b'\0')))
         return self.log.event('tx', domain=self.domain, interface=self.interface,
                               can_id=f'0x{can_id:03x}', payload_hex=payload.hex(),
-                              payload_bytes=len(payload), dlc=10 if len(payload)==16 else 15, **details)
+                              payload_bytes=len(payload), brs_flag=1, esi_flag=0, dlc=10 if len(payload)==16 else 15, **details)
 
     def recv(self, timeout):
         self.socket.settimeout(timeout)
@@ -85,7 +85,8 @@ class CAN:
         self.log.event('rx', domain=self.domain, interface=self.interface,
                        can_id=f'0x{can_id:03x}', payload_hex=payload.hex(),
                        payload_bytes=length, dlc=10 if length==16 else 15,
-                       kernel_epoch_ns=kernel_epoch_ns)
+                       kernel_epoch_ns=kernel_epoch_ns, brs_flag=flags & 1, esi_flag=(flags >> 1) & 1,
+                       interface_rx_drops=int(Path('/sys/class/net',self.interface,'statistics/rx_dropped').read_text()))
         return can_id, payload
 
     def close(self):
@@ -119,7 +120,13 @@ def api(app):
 
 def wait_interface(name):
     deadline = time.monotonic()+120
-    while not Path('/sys/class/net', name).exists():
+    while True:
+        flags = Path('/sys/class/net',name,'flags')
+        try:
+            if int(flags.read_text().strip(),16) & 1:
+                return
+        except FileNotFoundError:
+            pass
         if time.monotonic() > deadline:
             raise RuntimeError(f'{name} unavailable; topology setup did not finish')
         time.sleep(.1)

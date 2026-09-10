@@ -6,6 +6,7 @@ import socket
 import threading
 import time
 from common import *
+from telemetry import IDS, WIRE
 
 
 class Domain:
@@ -17,6 +18,9 @@ class Domain:
         self.jobs = queue.Queue(maxsize=1)
         self.result, self.busy, self.key, self.counter = None, False, None, 0
         self.runtime_seen = 0
+        self.lock = threading.Lock()
+        self.ids = IDS()
+        self.log.event("ids_artifacts", domain=domain, sha256=self.ids.artifacts)
         self.rate_started, self.rate_count = time.monotonic(), 0
         threading.Thread(target=self.loop, daemon=True).start()
         self.log.event('ready', domain=domain)
@@ -42,7 +46,8 @@ class Domain:
                 self.log.event('execution_error', domain=self.domain, error=str(exc))
             finally:
                 if config:
-                    self.busy = False
+                    with self.lock:
+                        self.busy = False
 
     def runtime(self, item):
         can_id, payload = item
@@ -63,14 +68,14 @@ class Domain:
             self.log.event('header_rejected', domain=self.domain)
             return
         kind, ecu, domain, flags, counter = DIAG_HEADER.unpack(payload[:8])
-        if (kind, ecu, domain, flags) != (0x1f, self.identity['ecu_id'], self.domain, 0x40):
+        if kind not in (0x1f, 0x1e) or (ecu, domain, flags) != (self.identity['ecu_id'], self.domain, 0x40):
             self.log.event('header_rejected', domain=self.domain)
             return
         if counter <= self.counter:
             self.log.event('replay_rejected', domain=self.domain, counter=counter, last_counter=self.counter)
             return
         try:
-            plaintext = AsconAEAD128Engine.decrypt(self.key, counter.to_bytes(4, 'big')+b'\0'*12,
+            plaintext = AsconAEAD128Engine.decrypt(self.key, SessionManager.derive_runtime_nonce(ecu, domain, counter, direction=0),
                                                    payload[8:48], payload[:8], payload[48:])
         except ValueError:
             self.log.event('runtime_tag_rejected', domain=self.domain, counter=counter)
@@ -78,9 +83,18 @@ class Domain:
         # Commit counter only after authentication; forged high counters cannot poison it.
         self.counter = counter
         self.runtime_seen += 1
-        self.log.event('diagnostic_accepted', domain=self.domain, counter=counter,
-                       source_sha256=plaintext[:32].hex(), ecu_monotonic_ns=int.from_bytes(plaintext[32:], 'big'),
-                       ids_tier2='NOT_EVALUATED_NO_VEHICLE_TELEMETRY')
+        if kind == 0x1e:
+            values = WIRE.unpack(plaintext)
+            try:
+                decision = self.ids.evaluate(values[:9], values[9])
+            except ValueError as exc:
+                self.log.event('telemetry_rejected', domain=self.domain, error=str(exc))
+                return
+            self.log.event('telemetry_evaluated', domain=self.domain, counter=counter, **decision)
+        else:
+            self.log.event('diagnostic_accepted', domain=self.domain, counter=counter,
+                           source_sha256=plaintext[:32].hex(), ecu_monotonic_ns=int.from_bytes(plaintext[32:], 'big'),
+                           tier15='NOT_EVALUATED_NO_VEHICLE_TELEMETRY', tier2='NOT_EVALUATED_NO_VEHICLE_TELEMETRY')
 
     def handshake(self, config):
         self.log.run_id = config['run_id']
@@ -88,20 +102,23 @@ class Domain:
         self.rate_count, self.rate_started = 0, time.monotonic()
         self.result = None
         ecu = self.identity['ecu_id']
-        session = int.from_bytes(os.urandom(4), 'big')
+        session = config['session_id']
+        self.ids.reset()
         challenge_frame, challenge = ChallengeFrame.issue(ecu, self.domain, session)
         bootstrap = KeyDerivation.derive_bootstrap_key(bytes.fromhex(self.identity['ikm']), challenge, ecu, session)
+        started_ns = time.monotonic_ns()
         self.can.send(CHALLENGE, challenge_frame, session_id=session)
         received, rounds = {}, []
-        gap = config.get('recovery_timeout_ms', 50)/1000
+        gap = config.get('recovery_timeout_ms', 5)/1000
         deadline = time.monotonic()+3  # Allows real Python signing, not a CAN timing claim.
         first_rx = None
         status = 'SUCCESS'
+        invalid_header_seen = False
         while len(received) < 41:
             remaining = deadline-time.monotonic()
             if remaining <= 0:
                 if len(rounds) == 3:
-                    status = 'ERR_RETRY_EXHAUSTION'
+                    status = 'ERR_HEADER_OUT_OF_RANGE' if invalid_header_seen else 'ERR_RETRY_EXHAUSTION'
                     break
                 missing = sum(1 << i for i in range(41) if i not in received)
                 rnd = len(rounds)+1
@@ -127,8 +144,8 @@ class Domain:
                     raise ValueError('invalid Cat 2 header')
             except ValueError:
                 self.log.event('header_rejected', domain=self.domain)
-                status = 'ERR_HEADER_OUT_OF_RANGE'
-                break
+                invalid_header_seen = True
+                continue  # A single injected header cannot abort an otherwise valid transfer.
             if index in received:
                 self.log.event('duplicate_rejected', domain=self.domain, frame_idx=index)
                 continue
@@ -142,6 +159,7 @@ class Domain:
             deadline = time.monotonic()+gap
             self.log.event('fragment_accepted', domain=self.domain, frame_idx=index, round=len(rounds))
         tag_valid = sig_valid = None
+        signature = None
         if status == 'SUCCESS':
             try:
                 signature = AttestationDeliveryManager.reassemble_and_unwrap(
@@ -156,14 +174,12 @@ class Domain:
                 if not sig_valid:
                     status = 'ERR_CRYPTO_SIG_INVALID'
         authenticated_ns = time.monotonic_ns()
-        # Admission budget starts at first accepted fragment. The CSV separately
-        # measures first ECU transmission to this authentication/failure point.
-        within_budget = first_rx is not None and (authenticated_ns-first_rx)/1000 <= config.get('ftti_us', 500000)
+        within_budget = (authenticated_ns-started_ns)/1000 <= config.get('ftti_us', 50000)
         self.log.event('authentication', domain=self.domain, ascon_tag_valid=tag_valid, mldsa_signature_valid=sig_valid, status=status)
-        if status == 'SUCCESS' and within_budget:
+        if status == 'SUCCESS' and (within_budget or config.get('admission_policy') == 'observe'):
             self.key = SessionManager.generate_session_key()
             self.can.send(KEY, KeyDeliveryFrame.wrap(bootstrap, self.key, 0xff, self.domain, session))
-            deadline = time.monotonic()+1
+            deadline = time.monotonic()+config.get('diagnostic_timeout_ms', 50)/1000
             while time.monotonic() < deadline and not self.runtime_seen:
                 try:
                     item = self.can.recv(max(.001, deadline-time.monotonic()))
@@ -172,10 +188,12 @@ class Domain:
                 except socket.timeout:
                     break
         self.result = dict(status=status, rounds=rounds, authenticated_ns=authenticated_ns,
-                           session_id=session, received_frames=len(received), first_rx_ns=first_rx,
+                           session_id=session, started_ns=started_ns, received_frames=len(received), first_rx_ns=first_rx,
                            key_delivered=self.key is not None, diagnostic_accepted=self.runtime_seen,
                            within_admission_budget=within_budget, ascon_tag_valid=tag_valid,
-                           mldsa_signature_valid=sig_valid)
+                           mldsa_signature_valid=sig_valid,
+                           verification_evidence=dict(signature_hex=signature.hex(), challenge_hex=challenge.hex(),
+                               public_key_hex=self.identity['public_key'], measurement_hex=self.identity['measurement']) if signature else None)
         self.log.event('termination', domain=self.domain, **self.result)
 
 
@@ -187,9 +205,14 @@ class Gateway:
         return dict(ready=True, domains={d:dict(busy=s.busy, result=s.result, run_id=s.log.run_id) for d,s in self.domains.items()})
     def command(self, path, config):
         state = self.domains[str(config['domain'])]
-        if path != '/run' or state.busy:
-            raise RuntimeError('domain busy or unsupported command')
-        state.busy = True
-        state.result = None
-        state.jobs.put_nowait(config)
+        with state.lock:
+            if path != '/run' or state.busy:
+                raise RuntimeError('domain busy or unsupported command')
+            state.busy = True
+            state.result = None
+            try:
+                state.jobs.put_nowait(config)
+            except queue.Full:
+                state.busy = False
+                raise RuntimeError('domain queue full')
         return {'started':config['run_id']}

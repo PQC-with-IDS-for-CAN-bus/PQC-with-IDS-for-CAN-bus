@@ -219,3 +219,6 @@ __marimo__/
 build/
 __pycache__/
 *.bin
+
+# Local runtime retained after DockerLab moved to Phase 3
+/Phase 2/DockerLab/state/

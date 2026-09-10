@@ -1,16 +1,5 @@
-# Phase 3 Deliverable: Docker CAN-FD Empirical Benchmarking Laboratory
+# Phase 3 Docker CAN-FD and PQC laboratory
 
-This laboratory is the **official Phase 3 empirical benchmarking environment** for our Post-Quantum Cryptography (PQC) and 3-Tier Intrusion Detection System (IDS) framework over CAN-FD.
-
----
-
-## 1. Architectural Scope & Purpose (Phase 3 Deliverable)
-
-- **Barebones Containerized Software Simulation:** Executes 4 independent ECU containers (Powertrain, Chassis, Body, Infotainment), an unenrolled attacker node, and a Central In-Vehicle Security Gateway (CISG) over isolated Linux SocketCAN (\xcan\) virtual interfaces.
-- **Empirical vs. Mathematical Comparison:** While the **Phase 2 Simulation Suite** serves as the algorithmic and protocol proof-of-concept, **DockerLab** measures true empirical end-to-end wire transit times, host execution latency, context switches, and microarchitectural cache misses (\perf stat\).
-- **Phase 3 Data Contracts Validation:** Emits empirical datasets (\perf_stat_summary.csv\, \	cpdump_latency_summary.csv\, \ault_recovery_runs.csv\) designed for direct comparison against the closed-form **worst-case response time (WCRT / Davis-Burns CAN-FD RTA)** mathematical model developed in Phase 3.
-
----
 This lab runs **four independent ECU containers**, a central security gateway,
 four isolated logical CAN domains, a controlled fault relay, an unenrolled attacker,
 and an independent `candump` observer. CAN frames travel through the Linux
@@ -67,7 +56,8 @@ changing the container's distribution does not change that kernel.
 
 Each domain has a distinct pair of ECU/relay and relay/gateway `vxcan` links.
 The relay broadcasts only within that domain. These are four logical segments
-inside one relay process, not one flat bus. The gateway terminates authentication
+inside one relay process, with independent per-domain forwarding threads and
+locks, not one flat bus. The gateway terminates authentication
 independently for each domain; no cross-domain forwarding policy is enabled.
 
 ```mermaid
@@ -192,8 +182,9 @@ not the existing vehicle telemetry type `0x11`. Its authenticated header is
 `>BBBBI`; its 40-byte plaintext is the actual source hash plus an actual
 eight-byte monotonic clock reading. It demonstrates session-key use and replay
 protection without disguising generated numbers as speed/RPM/wheel measurements.
-The nonce is the 32-bit counter followed by twelve zero bytes under a fresh
-per-session key. The gateway updates the counter only after valid authentication.
+The nonce uses Phase 1 `SessionManager.derive_runtime_nonce`: ECU ID, domain,
+direction, eight zero bytes, and the 32-bit counter. Fresh per-session keys prevent
+counter reset from reusing a key/nonce pair. Counter exhaustion requires rekeying. The gateway updates the counter only after valid authentication.
 
 The legacy C++ gateway's two-byte fragment index and variable-length index-list
 NACK are incompatible with these Python frames. This lab uses the Python
@@ -203,12 +194,13 @@ implementation. They are not substituted for a CAN controller's physical CRC.
 
 ## Executed scenarios
 
-By default, `run` performs **30 actual handshakes** and four runtime attacks:
+By default, `run` performs **31 actual handshakes** and four runtime attacks:
 
 - All five canonical scenarios on **each of the four domains**: clean; index 12;
   index 38; `14;15;16`; `20;21;22;23;24;25;26;27`.
 - Persistent loss, NACK omission, ciphertext corruption, and invalid fragment
-  header on domain 1.
+  header on domain 1. An additional single-header probe must recover successfully;
+  malformed frames no longer abort a valid handshake immediately.
 - Five independently seeded Bernoulli loss runs on domain 1. Both initial and
   retransmitted data frames are subject to the configured probability.
 - A fresh successful domain-1 handshake before runtime attacks.
@@ -222,13 +214,26 @@ Use `--monte-carlo N` to change the number of random-loss runs:
 python3 'Phase 3/DockerLab/lab.py' run --monte-carlo 20
 ```
 
-The default per-frame application pacing is 1 ms; recovery receive timeout is
-50 ms; ECU control wait is 500 ms. These are explicit experiment settings, not
-CAN bitrate emulation. The gateway initially allows three seconds for actual
-Python signing before its first recovery request. The experimental admission
-budget is 500,000 µs from first gateway fragment receipt. It is not a HARA-derived
-FTTI. CSV latency begins at the first ECU transmit log and ends at gateway
-authentication/failure, so its measurement boundary is recorded separately.
+Default application pacing is 250 µs, recovery timeout 5 ms, ECU control wait
+50 ms, and diagnostic response wait 50 ms. These are software experiment settings,
+not physical CAN bit-clock emulation. The initial signing allowance remains three
+seconds so the gateway does not request retransmissions before Python signing
+finishes. The **50,000 µs experimental admission budget starts before challenge
+transmission** and includes signing, wrapping, delivery, recovery and verification.
+ISO 26262 does not prescribe a universal 50 ms FTTI; this is not a HARA-derived claim.
+
+Normal scenarios withhold the operational key when that budget is exceeded.
+Cryptographic `SUCCESS` can therefore coexist with `SAFE_FALLBACK`; inspect
+`key_delivered`, `within_admission_budget`, and the ECU outcome in the manifest.
+The final handshake is explicitly labelled `admission_policy=observe` to establish
+a fresh session for attack demonstrations even on slow hosts. It still reports
+budget violations and is not evidence of real-time admission compliance.
+
+CSV end-to-end time starts immediately before the gateway challenge send and ends
+at gateway authentication/failure. For an observed all-NACK-loss ECU timeout, it
+ends at the ECU timeout instead. `crypto_preparation` independently records only
+ECU parsing, derivation, signing and wrapping, before the first attestation send;
+this interval is already inside end-to-end time and is never added twice.
 
 An in-path relay is essential: a passive attacker on a broadcast bus cannot
 remove a frame already delivered to another listener. The relay records reception,
@@ -247,6 +252,8 @@ state/
   exports/latest.json           # Most recent experiment location and outcome
   exports/<suite UUID>/
     fault_recovery_runs.csv     # Exactly 40 Phase 3 columns, in order
+    tcpdump_latency_summary.csv # 22-column kernel RX arrival evidence
+    perf_probe.txt              # Actual PMU availability probe
     events.jsonl                # Snapshot of that experiment's node events
     candump_since_lab_start.log # Capture snapshot; may include preceding suites
     measurement_profile.json   # Explicit virtual-SocketCAN measurement profile
@@ -272,12 +279,35 @@ has no separate transport-header fault enum; the manifest and relay event explic
 identify the header alteration. It is never reported as a clean fault model.
 Attack-only results are in the manifest, not forced into unrelated CSV columns.
 
-The profile remains **software-in-the-loop**, so physical bitrate, physical wire
-frame/byte counts and physical goodput are blank. Host latency is measured, and
-baseline differences remain signed rather than clipped. Strict Phase 3 physical
-validation therefore reports those unresolved fields. Do not promote this CSV
-to physical-bus evidence or copy it into the Phase 3 incoming directory as if it
-passed that contract. The baseline reference run is identified in the manifest.
+The profile remains **software-in-the-loop**. Physical bitrate, wire bytes including
+controller overhead, and physical goodput stay blank. `total_frames_on_wire` is
+explicitly the logical original data + retransmit + NACK count, excluding relay
+copies, challenge, key delivery and diagnostics. It is not an electrical capture
+count. Recovery overhead is zero for unsuccessful/no-retry runs, otherwise the
+non-negative excess over the referenced clean run; raw end-to-end values remain
+unaltered in CSV and endpoint evidence.
+
+`validate` runs the separately named software profile and checks all available
+field constraints, cross-field invariants, transmitted bitmap bytes, receiver
+counts, endpoint timing, artifact hashes and independent ML-DSA verification.
+The shared Phase 2 validator and Phase 3 schema are unchanged. The manifest retains
+strict physical-contract errors; software PASS does not mean hardware-contract PASS.
+
+`tcpdump_latency_summary.csv` follows the **current 22-column** schema, not the
+outdated 18-column list in `promt.md`. It contains actual gateway attestation
+arrivals, including retransmissions and malformed frames, with integer kernel
+`SO_TIMESTAMPNS` timestamps, real DLC/payload lengths, CAN flags and RX-drop counts.
+The source is SocketCAN `recvmsg`, explicitly recorded in the manifest. It is not
+labelled as parsed tcpdump data. Physical baud/duration and expected-pacing jitter
+remain unavailable. Session IDs map back to full run IDs in `manifest.json`.
+Independent `candump.log` and per-domain `.pcap` captures continue across repeated
+runs. The observer does not stop because an old `latest.json` exists.
+
+`perf` and `tcpdump` are installed. Each suite saves the real `perf stat` availability
+probe in `perf_probe.txt`. A denied PMU or unsupported counter is reported as
+unavailable. No `perf_stat_summary.csv` with fabricated measurements is produced.
+Contract 1 still needs scoped workload profiling on supported hardware. No host
+`perf_event_paranoid`/`kptr_restrict` changes are made automatically.
 
 ## Live observability
 
@@ -305,13 +335,45 @@ behavior, physical 1/2/5 Mbps timing, hardware PUFs, or ISO 26262 certification.
 Flooding measures application injection/rate-limit behavior, not physical bus
 saturation. A cryptographic rejection does not imply an ML IDS detected the attack.
 
-**Tier-2 vehicle IDS is explicitly not evaluated by this default lab.** The current
-repository contains models and summary artifacts, but this execution has no supplied
-complete, provenance-backed vehicle stream. The diagnostic bytes are not passed
-to the vehicle model. Integrating that stage requires recorded vehicle inputs,
-a versioned full sensor wire schema and the matching scaler/feature/window pipeline;
-inventing missing rear-wheel values or reporting placeholder anomaly scores would
-invalidate the experiment. Existing protocol/crypto Tier-1 gates run live here.
+## Optional recorded telemetry and IDS
+
+Without recorded inputs, diagnostics remain actual source-hash/clock bytes and IDS
+reports `NOT_EVALUATED_NO_VEHICLE_TELEMETRY`. No vehicle state or anomaly score is
+invented. ONNX Runtime, NumPy, the model, scaler and thresholds are included.
+
+To evaluate your own complete recording:
+
+```bash
+python3 'Phase 3/DockerLab/lab.py' run --telemetry /absolute/path/to/recording.json
+```
+
+Input JSON must contain `schema: "pqc-recorded-raw9-v1"`, `source_kind: "recorded"`,
+a nonempty `source_description`, exact `feature_names` from `telemetry.py`, and
+30–1000 `samples`. Each sample contains `values` (nine finite original raw signals)
+and `source_can_id` (208, 852, 1760 or 1255). Required raw order is vehicle speed,
+engine RPM, steering angle, brake pressure, four wheel speeds FL/FR/RL/RR, coolant.
+Do not substitute SI-unit guesses for the training signal units. Input provenance
+is user-declared and hashed, not independently certified as a road recording.
+
+The private type `0x1e` carries `>9fI` (36 signal bytes and four source-ID bytes)
+inside the authenticated 40-byte plaintext. It does not redefine Phase 1 Category 1.
+Missing signals are rejected. Four leave-one-wheel-out median residuals and one
+speed-to-mean-wheel residual produce the exact 14 features. Normalization uses
+exported scaler values without clipping; windows contain 30 consecutive samples
+and reset per session or invariant rejection. No zero-padding is used.
+
+Tier 1.5 currently checks the unit-independent all-wheels-stalled invariant; it
+does not claim a full physical ruleset without calibrated units. Tier 2 reports
+`WARMUP` until a complete window exists, then runs the real int8 ONNX model with
+one intra/inter-op thread. Scoring follows the training notebook's per-channel
+standardization and subsystem aggregation using the exported threshold file,
+not a hardcoded MSE threshold. Model/artifact compatibility and detection accuracy
+still require validation on representative labelled recordings. Unit tests using
+numerical vectors are not vehicle evaluation results.
+
+The replay runs only on domain 1, at 20 ms application pacing. Source data is
+mounted read-only into ECU 1; the attacker never receives its enrollment keys.
+See [AUDIT_REMEDIATION.md](AUDIT_REMEDIATION.md) for audit decisions and limits.
 
 ## Implementation map
 
@@ -340,3 +402,19 @@ Documentation consulted: [Docker Compose](https://docs.docker.com/reference/comp
 [can-utils](https://github.com/linux-can/can-utils), and
 [Alloy file collection](https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.file/).
 
+
+The dedicated capture observer runs as root with `NET_RAW`, `DAC_OVERRIDE`,
+`SETUID` and `SETGID` for libpcap/tcpdump and output files. It shares only the
+gateway network namespace, not credentials or management controls. Other
+application containers retain read-only filesystems, restricted capabilities
+and the default seccomp policy. The Dockerfile-specific ignore file excludes
+all `state/` directories, preventing credentials from entering image layers.
+
+Regression checks (after building):
+
+```bash
+docker run --rm --network none pqc-can-lab:local python -m unittest test_regressions
+```
+
+The saved-CSV mutation test additionally needs the actual exports mounted at
+`/evidence:ro`; otherwise that one test is explicitly skipped.

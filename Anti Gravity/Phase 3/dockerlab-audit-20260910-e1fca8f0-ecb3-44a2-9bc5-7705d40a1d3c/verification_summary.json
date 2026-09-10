@@ -1,0 +1,19 @@
+{
+  "suite": "e1fca8f0-ecb3-44a2-9bc5-7705d40a1d3c",
+  "software_checks_passed": true,
+  "handshake_runs": 31,
+  "runtime_attack_checks": 4,
+  "regression_tests_passed": 6,
+  "contract3_columns": 40,
+  "contract2_rows": 1273,
+  "ftti_violations": 24,
+  "strict_contract3_errors": 155,
+  "physical_contract_complete": false,
+  "perf_probe": {
+    "returncode": 255,
+    "status": "UNAVAILABLE_PERMISSION_OR_PMU",
+    "contract1_complete": false
+  },
+  "real_vehicle_evaluation": "NOT_RUN_NO_COMPLETE_RECORDED_INPUT_SUPPLIED",
+  "source_suite": "/home/kunal/PQC-with-IDS-for-CAN-bus/Phase 3/DockerLab/state/exports/e1fca8f0-ecb3-44a2-9bc5-7705d40a1d3c"
+}
