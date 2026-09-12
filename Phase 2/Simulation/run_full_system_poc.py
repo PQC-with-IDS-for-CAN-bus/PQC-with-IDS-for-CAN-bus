@@ -37,6 +37,8 @@ import time
 import json
 import uuid
 import struct
+import zlib
+import base64
 import hashlib
 import argparse
 import numpy as np
@@ -44,6 +46,42 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime, timezone
 import generate_e2e_report
+
+# Embedded 1,000-frame authentic golden driving telemetry for zero-dependency standalone execution
+EMBEDDED_TELEMETRY_1000_B64 = (
+    "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"
+)
+
 
 # CLI Arguments
 parser = argparse.ArgumentParser(description="Unified End-to-End Post-Quantum CAN-FD & 3-Tier IDS PoC")
@@ -98,9 +136,10 @@ _fixtures_candidates = [
         r / "Anti Gravity/Phase 2/fixtures",
     ]
 ]
-FIXTURES_DIR = next((p for p in _fixtures_candidates if (p / "telemetry_golden_fixture_3000.json").exists()), None)
-if not FIXTURES_DIR:
+FIXTURES_DIR = next((p for p in _fixtures_candidates if (p / f"telemetry_golden_fixture_{args.frames}.json").exists() or (p / "telemetry_golden_fixture_1000.json").exists() or (p / "telemetry_golden_fixture_3000.json").exists()), None)
+if not FIXTURES_DIR and args.frames != 1000:
     raise FileNotFoundError("telemetry_golden_fixture_3000.json not found in candidate paths.")
+
 
 # 4. ONNX Models candidate discovery
 _models_candidates = [
@@ -260,17 +299,26 @@ gw_sock.close()
 print("\n[PHASE B] Executing Operational Telemetry & Complete 3-Tier IDS Streaming...")
 
 # Load Selected Golden Telemetry Fixture (1,000 or 3,000 frames)
-fixture_file = FIXTURES_DIR / f"telemetry_golden_fixture_{args.frames}.json"
-if not fixture_file.exists():
+fixture_file = (FIXTURES_DIR / f"telemetry_golden_fixture_{args.frames}.json") if FIXTURES_DIR else None
+records = None
+episodes = []
+
+if fixture_file and fixture_file.exists():
+    with open(fixture_file, "r", encoding="utf-8") as f:
+        fixture_data = json.load(f)
+    records = fixture_data.get("records", fixture_data)
+    episodes = fixture_data.get("metadata", {}).get("episodes", [])
+    duration_s = args.frames * 0.010
+    print(f"  Loaded {len(records)} frames from {fixture_file.name} (Nominal Duration: {duration_s:.1f}s at 100 Hz).")
+elif args.frames == 1000:
+    print("  [Notice] Fixture file not found on disk. Unpacking embedded 1,000-frame golden telemetry from memory...")
+    decomp = json.loads(zlib.decompress(base64.b64decode(EMBEDDED_TELEMETRY_1000_B64)).decode("utf-8"))
+    keys = ['speed', 'rpm', 'steering_angle', 'brake_pressure', 'wheel_speed_fl', 'wheel_speed_fr', 'wheel_speed_rl', 'wheel_speed_rr', 'engine_temp', 'gear_status', 'dtc_flags', 'throttle_pos', 'label', 'attack_type', 'episode_id']
+    records = [dict(zip(keys, row)) for row in decomp]
+    duration_s = 1000 * 0.010
+    print(f"  Unpacked {len(records)} authentic frames from memory (Nominal Duration: {duration_s:.1f}s at 100 Hz).")
+else:
     raise FileNotFoundError(f"Fixture not found at {fixture_file}. Run build_parametric_telemetry_fixture.py first.")
-
-with open(fixture_file, "r") as f:
-    fixture_data = json.load(f)
-
-records = fixture_data["records"]
-episodes = fixture_data["metadata"].get("episodes", [])
-duration_s = args.frames * 0.010
-print(f"  Loaded {len(records)} frames from {fixture_file.name} (Nominal Duration: {duration_s:.1f}s at 100 Hz).")
 
 # Initialize ONNX INT8 Autoencoder & Anomaly Thresholds
 onnx_model_file = MODELS_DIR / "v30_physical_kinematics_dynamic_int8.onnx"
