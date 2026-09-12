@@ -17,7 +17,7 @@ This report establishes the complete design, mathematical formulation, edge opti
 1. **Tier 1 (Deterministic Wire Firewall):** Line-rate packet filtering executing $100\text{ ns}$ leaky-bucket rate limiting ($f_{\max} = 1.0\text{ kHz}$ interface / $200\text{ Hz}$ ECU), a $2\,\mu\text{s}$ monotonic sequence counter gate, and constant-time NIST SP 800-232 Ascon-128 AEAD tag verification ($0.45\text{ ms}$). Achieves **100% deterministic recall with 0.0% FPR** across wire corruption, replay, and DoS flooding.
 2. **Tier 1.5 (Discrete Invariant Engine):** Sub-microsecond ($<10\,\mu\text{s}$) rule-based evaluation of mutually exclusive physical state transitions (e.g., Reverse Light at forward highway velocity, stalled wheel speeds at high ground speed, simultaneous maximum throttle and brake). Achieves **100% precision and recall with zero neural network overhead**.
 3. **Tier 2 (Continuous 14D Kinematic Autoencoder):** A dual-bias PyTorch LSTM Autoencoder ($24,654$ parameters, $W=30$ sliding window) monitoring 14 continuous telemetry channels, featuring a novel **3-element Leave-One-Out (LOO) Median Differential** for instantaneous single-wheel anomaly isolation. Quantized to INT8 ONNX executing in **$0.82\text{ ms}$ on ARM Cortex-A72 (Raspberry Pi 4)**—well within the safety-critical $10.0\text{ ms}$ deadline.
-4. **Federated Learning Fleet Consensus:** A 5-silo heterogeneous Flower (`flwr`) FedAvg architecture trained across diverse driving regimes from the Oak Ridge National Laboratory (ORNL) ROAD dataset. Over 10 communication rounds, client parameter drift $\Delta L_2$ contracted from $2.7418 \to 1.1824$, with the global consensus model achieving a **4.3× to 24.3× lower reconstruction error on unseen fleet test suites** compared to isolated single-vehicle models.
+4. **Federated Learning Fleet Consensus:** A 5-silo heterogeneous Flower (`flwr`) FedAvg architecture trained across diverse driving regimes from the Oak Ridge National Laboratory (ORNL) ROAD dataset. Over 10 communication rounds, client parameter drift $\Delta L_2$ contracted by **56.88%** ($2.7418 \to 1.1824$). While isolated single-silo models suffer catastrophic generalization collapse on out-of-domain regimes (e.g. Local Silo 3 MSE of $0.040995$ vs Global $0.003948$—a **10.4× advantage** for consensus on unseen fleet data), the Global Federated Model achieves the **lowest overall multi-domain fleet mean MSE ($0.01913$)** across all 5 operational regimes, guaranteeing fleet-wide stability without centralizing raw vehicle telemetry.
 5. **28-Scenario Adversarial Threat Benchmark:** An exhaustive evaluation spanning wire attacks (AT-01–06), fragmentation fuzzing (AT-07–11), discrete invariants (AT-12–16), real ORNL ROAD masquerades (AT-17–20), and 8 pioneering novel attack vectors (AT-21–28) including sub-threshold boiling-frog drift, 4-wheel symmetric LOO evasion, and DTC steganography.
 
 ---
@@ -223,17 +223,29 @@ $$W_{t+1} = \sum_{k=1}^5 \frac{N_k}{\sum_{j=1}^5 N_j} W_{t+1}^{(k)}$$
 ========================================================================================================================
   Model Evaluated           Silo 1 Test    Silo 2 Test    Silo 3 Test    Silo 4 Test    Silo 5 Test    Dataset C2 Fleet
   ----------------------------------------------------------------------------------------------------------------------
-  Silo 1 Local (Highway)    0.000412       0.003891       0.004120       0.008912       0.005120       0.024180
-  Silo 2 Local (City)       0.003410       0.000385       0.003940       0.007810       0.004890       0.019450
-  Silo 3 Local (Dyno Basic) 0.004120       0.003820       0.000295       0.006120       0.003410       0.014890
-  Silo 4 Local (Bit Exer)   0.007890       0.006910       0.005810       0.000412       0.005120       0.031200
-  Silo 5 Local (Dyno Ext)   0.004810       0.004120       0.003180       0.004910       0.000310       0.016780
+  Silo 1 Local (Highway)    0.029040       0.007160       0.082182       0.011357       0.007591       0.002710
+  Silo 2 Local (City)       0.052485       0.000235       0.137995       0.004076       0.000096       0.007358
+  Silo 3 Local (Dyno Basic) 0.036497       0.078535       0.016140       0.076595       0.079736       0.040995
+  Silo 4 Local (Bit Exer)   0.052663       0.000426       0.136721       0.002629       0.000174       0.007360
+  Silo 5 Local (Dyno Ext)   0.052431       0.000247       0.137487       0.003625       0.000078       0.007256
   ----------------------------------------------------------------------------------------------------------------------
-  Global FedAvg Consensus   0.000512       0.000495       0.000380       0.000610       0.000420       0.001284
+  Global FedAvg Consensus   0.041134       0.000814       0.064912       0.003223       0.000740       0.003948
   ======================================================================================================================
-  Consensus Advantage:      Achieves 4.3x to 24.3x lower error on unseen fleet test suite (Dataset C2).
+  Mean Cross-Domain MSE:    Local Models: 0.02334 to 0.05475  |  Global Consensus Model: 0.01913 (Best Fleet-Wide)
 ========================================================================================================================
 ```
+
+#### Multi-Domain Generalization & Fleet Stability Analysis:
+1. **The Single-Domain Overfitting Trap:** When evaluating local models on their native domains, single-silo models achieve low reconstruction loss (e.g. Local Model 2 achieves $0.000235$ on urban streets, and Local Model 5 achieves $0.000078$ on extended dyno). However, when deployed out-of-distribution, isolated local models suffer catastrophic generalization collapse: Local Model 2's error explodes by **587×** to $0.137995$ on dyno conditions, and Local Model 3 explodes to $0.078535$ on city streets.
+2. **Fleet Test Robustness on Untouched Data (Dataset C2):** On the held-out reverse dyno fleet suite, specialized dyno models like Local Model 3 exhibit severe error ($0.040995$), whereas the Global Federated Consensus model achieves **$0.003948$—a 10.4× error reduction**. While Local Model 1 (trained on smooth highway cruising) achieved low error ($0.002710$) on straight reverse maneuvers due to low steering variance, Local Model 1 performed poorly on powertrain stress cycles ($0.082182$ on Silo 3 vs Global's $0.064912$).
+3. **The Bias-Variance Trade-Off:** Computing the **macro-averaged MSE across all 5 operational silos plus the fleet test suite** demonstrates the true mathematical justification for Federated Averaging:
+   - Local Model 1 (Highway) Average: $0.02334$
+   - Local Model 2 (City) Average: $0.03371$
+   - Local Model 3 (Dyno Basic) Average: $0.05475$
+   - Local Model 4 (Bit Exercising) Average: $0.03333$
+   - Local Model 5 (Dyno Extended) Average: $0.03352$
+   - **Global FedAvg Consensus Average: $\mathbf{0.01913}$** (Lowest overall fleet error across all operating domains).
+The Federated Consensus Model successfully dampens client-specific distribution skew, preventing local overfit and guaranteeing the lowest fleet-wide operational risk without ever centralizing raw vehicle telemetry.
 
 ---
 
@@ -260,18 +272,20 @@ The following benchmark table reflects the empirical evaluation across all 28 at
 | AT-14 | Invariant — All Wheels Stalled at Highway Velocity | Tier 1.5 + Tier 2 | 300 | 150 | 0 | 150 | 0 | 1.0 | 1.0 | 0.0 | 1.0 | 1.0 | 0.667 | INV_03_All_Wheels_Stalled | PASS |
 | AT-15 | Invariant — Simultaneous Full Brake & Max Throttle | Tier 1.5 | 300 | 150 | 0 | 150 | 0 | 1.0 | 1.0 | 0.0 | 1.0 | 1.0 | 0.871 | INV_04_Brake_Throttle_Conflict | PASS |
 | AT-16 | Invariant — DTC Flag Word Saturation | Tier 1.5 + Tier 2 | 300 | 150 | 0 | 150 | 0 | 1.0 | 1.0 | 0.0 | 1.0 | 1.0 | 0.896 | INV_05_DTC_Saturation | PASS |
-| AT-17 | ROAD Dataset — Speedometer Masquerade (3 Runs) | Tier 2 | 286248 | 0 | 0 | 6581 | 50663 | 0.8785 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | Tier2_LSTM_Reconstruction_Error | PASS |
-| AT-18 | ROAD Dataset — Correlated Wheel Speed Masquerade (3 Runs) | Tier 2 | 138956 | 0 | 0 | 4754 | 23032 | 0.8529 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | Tier2_LSTM_Reconstruction_Error | PASS |
+| AT-17 | ROAD Dataset — Speedometer Masquerade (3 Runs) | Tier 2 | 286248 | 0 | 0 | 6581 | 50663 | 0.8785 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | Tier2_LSTM_Reconstruction_Error | EVADED_STATIC_TAU (Solved in Phase 3)* |
+| AT-18 | ROAD Dataset — Correlated Wheel Speed Masquerade (3 Runs) | Tier 2 | 138956 | 0 | 0 | 4754 | 23032 | 0.8529 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | Tier2_LSTM_Reconstruction_Error | EVADED_STATIC_TAU (Solved in Phase 3)* |
 | AT-19 | ROAD Dataset — Engine Coolant Temp Masquerade | Tier 2 | 17212 | 0 | 0 | 3179 | 258 | 0.9996 | 0.9535 | 0.0 | 0.0 | 0.0 | 0.269 | Tier2_Subsystem_1255_Coolant_Spike | PASS |
 | AT-20 | ROAD Dataset — Reverse Light Manipulations (6 Runs) | Tier 2 | 146612 | 0 | 0 | 6079 | 23238 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.269 | Tier1.5_Discrete_Invariant_Gate (AT-12) | ROUTED_TO_TIER_1.5 |
 | AT-21 | ROAD Dataset — Accelerator Manipulation (4 Runs) | Tier 2 | 24000 | 0 | 0 | 2390 | 2405 | 0.6118 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | Throttle_Channel_Absent_In_14D_Profile (Gap Analysis) | ARCHITECTURAL_GAP_IDENTIFIED |
-| AT-22 | Novel — Boiling-Frog Gradual Velocity Drift | Tier 2 | 500 | 0 | 0 | 71 | 400 | 0.935 | 0.0 | 0.0 | 0.0 | 0.0 | 4000.0 | Dwell_Time_Threshold_Cross_400_Frames | PASS |
-| AT-23 | Novel — 4-Wheel Symmetric LOO Evasion | Tier 2 | 300 | 0 | 0 | 121 | 150 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | Subsystem_208_Speed_Spike (LOO_Evaded) | PASS |
-| AT-24 | Novel — Temporal Window-Boundary Poisoning | Tier 2 | 60 | 0 | 0 | 1 | 30 | 1.0 | 0.0 | 0.0 | 1.0 | 1.0 | 0.269 | Sliding_Window_Temporal_Diffusion | PASS |
+| AT-22 | Novel — Boiling-Frog Gradual Velocity Drift | Tier 2 | 500 | 0 | 0 | 71 | 400 | 0.935 | 0.0 | 0.0 | 0.0 | 0.0 | 4000.0 | Dwell_Time_Threshold_Cross_400_Frames | EVADED_STATIC_TAU (Sub-Threshold Drift) |
+| AT-23 | Novel — 4-Wheel Symmetric LOO Evasion | Tier 2 | 300 | 0 | 0 | 121 | 150 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | Subsystem_208_Speed_Spike (LOO_Evaded) | EVADED_STATIC_TAU (4-Wheel LOO Evasion) |
+| AT-24 | Novel — Temporal Window-Boundary Poisoning | Tier 2 | 60 | 0 | 0 | 1 | 30 | 1.0 | 0.0 | 0.0 | 1.0 | 1.0 | 0.269 | Sliding_Window_Temporal_Diffusion | EVASION_IDENTIFIED (Diffusion Artifact) |
 | AT-25 | Novel — Minimum-Perturbation Gradient Search | Tier 2 | 360 | 1 | 0 | 1 | 0 | 1.0 | 1.0 | 0.0 | 1.0 | 1.0 | 0.269 | Min_Delta_Coolant_50.00_DegC | PASS |
 | AT-26 | Novel — uint32 Monotonic Counter Wraparound | Tier 1 | 2 | 1 | 0 | 1 | 0 | 1.0 | 1.0 | 0.0 | 1.0 | 1.0 | 0.002 | Tier1_Counter_Overflow_Reject | PASS |
-| AT-27 | Novel — Stateful EMA Buffer Preconditioning | Tier 2 | 600 | 0 | 0 | 236 | 50 | 0.9981 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | EMA_Conditioned_Residual_Trigger | PASS |
+| AT-27 | Novel — Stateful EMA Buffer Preconditioning | Tier 2 | 600 | 0 | 0 | 236 | 50 | 0.9981 | 0.0 | 0.0 | 0.0 | 0.0 | 0.269 | EMA_Conditioned_Residual_Trigger | EVADED_STATIC_TAU (Preconditioning Evasion) |
 | AT-28 | Novel — DTC Steganographic Covert Channel | Tier 2 | 112 | 0 | 0 | 83 | 0 | 1.0 | 1.0 | 0.0 | 1.0 | 1.0 | 0.01 | Covert_Channel_Zero_MSE_Evasion (Bandwidth: 100 bps) | EXPECTED_EVASION |
+
+*\*Note on Static Threshold Evasion vs ROC-AUC:* While unthresholded ROC-AUC demonstrates strong mathematical separability (AUC > 0.85), operating at a frozen calibration threshold ($P_{99.5}$) without streaming window hygiene leads to zero operational recall for subtle masquerades. In Phase 3, this limitation is resolved via the **Streaming FIFO Buffer Quarantine Wrapper**, which purges unverified frames before committing them to the rolling window, restoring operational Recall to **100.0%** for AT-17 and AT-18 with continuous ambient FPR $\le 1.21\% - 2.94\%$.
 
 ---
 
@@ -291,12 +305,12 @@ The following benchmark table reflects the empirical evaluation across all 28 at
 | Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Speedometer Spoofing (Trial 1) | PyTorch FP32 (Base) | 0.9995 | 99.90% | 0.141% | 0.9989 | 0 | 1.11 ms (Dev) / 5.92 ms (RPi4) | PASS (Verified) |
 | Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Speedometer Spoofing (Trial 1) | ONNX FP32 (Golden Ref) | 0.9995 | 99.90% | 0.141% | 0.9989 | 0 | 0.15 ms (Dev) / 0.82 ms (RPi4) | PASS (Verified) |
 | Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Speedometer Spoofing (Trial 1) | ONNX Dynamic INT8 (Ablation) | 0.9996 | 99.90% | 0.141% | 0.9989 | 0 | 0.19 ms (Dev) / 1.01 ms (RPi4) | PASS (Verified) |
-| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Wheel Speed Spoofing (Trial 1) | PyTorch FP32 (Base) | 0.9961 | 0.00% | 0.000% | 0.0 | 0 | 1.11 ms (Dev) / 5.92 ms (RPi4) | PASS (Verified) |
-| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Wheel Speed Spoofing (Trial 1) | ONNX FP32 (Golden Ref) | 0.9961 | 0.00% | 0.000% | 0.0 | 0 | 0.15 ms (Dev) / 0.82 ms (RPi4) | PASS (Verified) |
-| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Wheel Speed Spoofing (Trial 1) | ONNX Dynamic INT8 (Ablation) | 0.9967 | 0.00% | 0.000% | 0.0 | 0 | 0.19 ms (Dev) / 1.01 ms (RPi4) | PASS (Verified) |
-| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Coolant Temp Spoofing (Trial 1) | PyTorch FP32 (Base) | 0.9988 | 0.00% | 0.000% | 0.0 | 0 | 1.11 ms (Dev) / 5.92 ms (RPi4) | PASS (Verified) |
-| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Coolant Temp Spoofing (Trial 1) | ONNX FP32 (Golden Ref) | 0.9988 | 0.00% | 0.000% | 0.0 | 0 | 0.15 ms (Dev) / 0.82 ms (RPi4) | PASS (Verified) |
-| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Coolant Temp Spoofing (Trial 1) | ONNX Dynamic INT8 (Ablation) | 0.999 | 0.00% | 0.000% | 0.0 | 0 | 0.19 ms (Dev) / 1.01 ms (RPi4) | PASS (Verified) |
+| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Wheel Speed Spoofing (Trial 1) | PyTorch FP32 (Base) | 0.9961 | 0.00% | 0.000% | 0.0 | 0 | 1.11 ms (Dev) / 5.92 ms (RPi4) | STATIC_TAU_EVASION (100% Recall via Phase 3 Quarantine) |
+| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Wheel Speed Spoofing (Trial 1) | ONNX FP32 (Golden Ref) | 0.9961 | 0.00% | 0.000% | 0.0 | 0 | 0.15 ms (Dev) / 0.82 ms (RPi4) | STATIC_TAU_EVASION (100% Recall via Phase 3 Quarantine) |
+| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Wheel Speed Spoofing (Trial 1) | ONNX Dynamic INT8 (Ablation) | 0.9967 | 0.00% | 0.000% | 0.0 | 0 | 0.19 ms (Dev) / 1.01 ms (RPi4) | STATIC_TAU_EVASION (100% Recall via Phase 3 Quarantine) |
+| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Coolant Temp Spoofing (Trial 1) | PyTorch FP32 (Base) | 0.9988 | 0.00% | 0.000% | 0.0 | 0 | 1.11 ms (Dev) / 5.92 ms (RPi4) | STATIC_TAU_EVASION (100% Recall via Phase 3 Quarantine) |
+| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Coolant Temp Spoofing (Trial 1) | ONNX FP32 (Golden Ref) | 0.9988 | 0.00% | 0.000% | 0.0 | 0 | 0.15 ms (Dev) / 0.82 ms (RPi4) | STATIC_TAU_EVASION (100% Recall via Phase 3 Quarantine) |
+| Tier 2 (Kinematic IDS) | Kinematic Inconsistency | ROAD: Coolant Temp Spoofing (Trial 1) | ONNX Dynamic INT8 (Ablation) | 0.999 | 0.00% | 0.000% | 0.0 | 0 | 0.19 ms (Dev) / 1.01 ms (RPi4) | STATIC_TAU_EVASION (100% Recall via Phase 3 Quarantine) |
 
 ---
 
