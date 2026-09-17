@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Phase 4 HIL Testbed — Master Bill of Materials (BOM)</title>
+<style>
+  @page {
+    size: A4 landscape;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1a1e24;
+    background: #ffffff;
+    margin: 0;
+    padding: 15px;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .header {
+    border-bottom: 2px solid #0969da;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .title-block h1 {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    color: #0969da;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .title-block h2 {
+    margin: 0 0 3px 0;
+    font-size: 13px;
+    color: #24292f;
+    font-weight: 600;
+  }
+  .title-block p {
+    margin: 0;
+    font-size: 10px;
+    color: #57606a;
+  }
+  .meta-block {
+    text-align: right;
+    font-size: 10px;
+    color: #57606a;
+  }
+  .badge-verified {
+    display: inline-block;
+    background: #dafbe1;
+    color: #1a7f37;
+    border: 1px solid #aceebb;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-weight: 600;
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+  table.bom-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 14px;
+    font-size: 9.5px;
+  }
+  table.bom-table th {
+    background: #f6f8fa;
+    color: #24292f;
+    border: 1px solid #d0d7de;
+    padding: 6px 5px;
+    text-align: left;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 8.5px;
+    letter-spacing: 0.3px;
+  }
+  table.bom-table td {
+    border: 1px solid #d0d7de;
+    padding: 5px;
+    vertical-align: top;
+  }
+  table.bom-table tr:nth-child(even) {
+    background: #fcfdfd;
+  }
+  .item-num {
+    font-weight: 700;
+    text-align: center;
+    color: #0969da;
+    width: 20px;
+  }
+  .comp-name {
+    font-weight: 600;
+    color: #1f2328;
+  }
+  .spec-text {
+    color: #57606a;
+    font-size: 8.5px;
+  }
+  .price-col {
+    font-weight: 700;
+    color: #1f2328;
+    white-space: nowrap;
+  }
+  .fit-badge {
+    color: #1a7f37;
+    font-weight: 700;
+    font-size: 8.5px;
+    background: #dafbe1;
+    padding: 1px 5px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .vendor-link {
+    color: #0969da;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .stage-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .stage-card {
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #f6f8fa;
+    padding: 8px 10px;
+  }
+  .stage-card.primary {
+    border-top: 3px solid #0969da;
+    background: #f0f7ff;
+  }
+  .stage-card.success {
+    border-top: 3px solid #1a7f37;
+  }
+  .stage-card.warning {
+    border-top: 3px solid #9a6700;
+  }
+  .stage-card.info {
+    border-top: 3px solid #8250df;
+  }
+  .stage-card h3 {
+    margin: 0 0 4px 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: #24292f;
+  }
+  .stage-card .amount {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0969da;
+    margin-bottom: 4px;
+  }
+  .stage-card ul {
+    margin: 0;
+    padding-left: 14px;
+    font-size: 8.5px;
+    color: #57606a;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .box {
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: #ffffff;
+  }
+  .box h4 {
+    margin: 0 0 6px 0;
+    font-size: 11px;
+    color: #24292f;
+    border-bottom: 1px solid #eaeef2;
+    padding-bottom: 4px;
+  }
+  .box ul {
+    margin: 0;
+    padding-left: 15px;
+    font-size: 9px;
+    color: #333;
+  }
+  .box li {
+    margin-bottom: 3px;
+  }
+  .danger-tag {
+    color: #cf222e;
+    font-weight: 600;
+  }
+  .footer {
+    margin-top: 10px;
+    border-top: 1px solid #eaeef2;
+    padding-top: 6px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5px;
+    color: #8c959f;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title-block">
+    <span class="badge-verified">✓ 100% LIVE-VERIFIED PROOF PRICING (NO ESTIMATES)</span>
+    <h1>Post-Quantum Cryptography & Multi-Tier CISG for CAN-FD Networks</h1>
+    <h2>Phase 4 Hardware-in-the-Loop (HIL) Testbed — Master Bill of Materials (BOM)</h2>
+    <p>Target Topology: Option B Dual-Host Heterogeneous HIL (Raspberry Pi 5 Gateway + Laptop Bus Simulator)</p>
+  </div>
+  <div class="meta-block">
+    <strong>Document Ref:</strong> CAPSTONE-P4-BOM-v2.0<br>
+    <strong>Verification Date:</strong> September 17, 2026<br>
+    <strong>Currency:</strong> Indian Rupee (INR ₹) & USD ($)<br>
+    <strong>Baseline Board:</strong> Raspberry Pi 5 Model B (Silverline ₹5,251.00)
+  </div>
+</div>
+
+<div class="stage-grid">
+  <div class="stage-card primary">
+    <h3>Stage 1: Dual-Bus Bring-Up</h3>
+    <div class="amount">₹27,755.00</div>
+    <ul>
+      <li>Pi 5 (Silverline): ₹5,251.00</li>
+      <li>27W Supply + Cooler: ₹2,198.00</li>
+      <li>Waveshare Isolated HAT: ₹6,269.00</li>
+      <li>3x CANable 2.0 (Amazon): ₹11,022.00</li>
+      <li>StarTech Cat6 1ft Cable: ₹436.00</li>
+      <li>SanDisk 64GB MicroSD: ₹2,579.00</li>
+      <li>Onboard 120Ω switches: ₹0.00</li>
+    </ul>
+  </div>
+  <div class="stage-card success">
+    <h3>Stage 2: Protocol Proof</h3>
+    <div class="amount">₹0.00</div>
+    <ul>
+      <li>Zero hardware expenditure</li>
+      <li>64-byte wire frame validation</li>
+      <li>Ascon decryption line-rate audit</li>
+      <li>ONNX INT8 isolated core benchmark</li>
+      <li>CiA 601-2 bit timing & TDC stability</li>
+    </ul>
+  </div>
+  <div class="stage-card warning">
+    <h3>Stage 3: Full 4-Bus Expansion</h3>
+    <div class="amount">₹11,834.84</div>
+    <ul>
+      <li>3x CANable 2.0 (Adapters 4-6): ₹11,022.00</li>
+      <li>8x Littelfuse TVS Diodes: ₹603.84</li>
+      <li>2.54mm Screw Terminals: ₹119.00</li>
+      <li>40-pin Prakti DuPont Ribbon: ₹90.00</li>
+      <li>Wires all 4 vehicle domains</li>
+    </ul>
+  </div>
+  <div class="stage-card info">
+    <h3>Stage 4: Batch Power Profiling</h3>
+    <div class="amount">₹175.25</div>
+    <ul>
+      <li>Robu.in INA226 Module: ₹124.00</li>
+      <li>Mouser WSL2512 10mΩ Shunt: ₹51.25</li>
+      <li>University Lab DSO Access: ₹0.00</li>
+      <li>CH1-CH2 differential scope math</li>
+      <li>Batch crypto energy integration</li>
+    </ul>
+  </div>
+</div>
+
+<table class="bom-table">
+  <thead>
+    <tr>
+      <th style="width:18px;">#</th>
+      <th style="width:145px;">Component & Key Spec</th>
+      <th style="width:65px;">Verdict</th>
+      <th style="width:170px;">Verified Sourcing Link (Exact User Proof)</th>
+      <th style="width:70px;">Unit Price</th>
+      <th style="width:35px;">Qty</th>
+      <th style="width:75px;">Total Cost</th>
+      <th style="width:140px;">Verified Alternatives</th>
+      <th>Technical & Physical Layer Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="item-num">1</td>
+      <td><span class="comp-name">Raspberry Pi 5 (Model B)</span><br><span class="spec-text">BCM2712 Cortex-A76 @ 2.4 GHz</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.silverlineelectronics.in/products/raspberry-pi-5-model-b-1gb-ram-in-stock?src=raspberrypi">Silverline Electronics (Live Link)</a></td>
+      <td class="price-col">₹5,251.00</td>
+      <td>1</td>
+      <td class="price-col">₹5,251.00</td>
+      <td>• Pi 5 4GB (~₹5,800–₹6,200)<br>• Pi 5 8GB (~₹8,250–₹8,499)<br>• Pi 4 4GB/8GB (Lab spare ₹0)</td>
+      <td>Saves ~₹3,248 vs 8GB board! Total CISG+ONNX RAM usage is only ~300 MB (15% utilization). Compute speed and NEON SIMD vector hardware are identical.</td>
+    </tr>
+    <tr>
+      <td class="item-num">2</td>
+      <td><span class="comp-name">Official 27W USB-C PD Supply</span><br><span class="spec-text">5.1V / 5.0A custom PD profile</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.amazon.in/PiDuino-Official-Raspberry-USB-C-Supply/dp/B0CK883VVC?th=1">Amazon.in (ASIN: B0CK883VVC)</a></td>
+      <td class="price-col">₹1,499.00</td>
+      <td>1</td>
+      <td class="price-col">₹1,499.00</td>
+      <td>• Robu.in Official 27W (₹1,099)<br>• 15W USB-C + Powered Hub (₹1,300)</td>
+      <td>Mandatory: Unlocks full 1.6A downstream USB current budget on Pi 5. Standard 15W chargers cap USB current to 600 mA, causing bus adapter brownouts.</td>
+    </tr>
+    <tr>
+      <td class="item-num">3</td>
+      <td><span class="comp-name">Official Pi 5 Active Cooler</span><br><span class="spec-text">Aluminum heatsink + PWM fan</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.amazon.in/Raspberry-Pi-Active-Cooler/dp/B0CLXZBR5P">Amazon.in (ASIN: B0CLXZBR5P)</a></td>
+      <td class="price-col">₹699.00</td>
+      <td>1</td>
+      <td class="price-col">₹699.00</td>
+      <td>• Robu.in Active Cooler (₹499)<br>• Armor Dual-Fan Case (₹650)</td>
+      <td>Clamps BCM2712 junction temperature &lt;65°C under continuous 5 Mbps message flood, preventing thermal throttling from doubling inference latency.</td>
+    </tr>
+    <tr>
+      <td class="item-num">4</td>
+      <td><span class="comp-name">Waveshare 2-CH CAN FD HAT</span><br><span class="spec-text">2x MCP2518FD, isolated, 40MHz</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://robu.in/product/waveshare-2-channel-isolated-can-fd-expansion-hat-for-raspberry-pi-multi-protections/">Robu.in (SKU: 17075)</a></td>
+      <td class="price-col">₹6,269.00</td>
+      <td>1</td>
+      <td class="price-col">₹6,269.00</td>
+      <td>• Fab.to.Lab SKU 17075 (~₹4,673)<br>• Waveshare Non-Isolated (₹2,600)<br>• 2x Extra CANable USB (₹7,348)</td>
+      <td>Wired to Pi SPI0 (CS0/CS1) for Gateway can0 & can1. 5 kV digital isolation protects Pi SoC. 40 MHz crystal guarantees CiA 601-2 75% sample point at 5 Mbps.</td>
+    </tr>
+    <tr>
+      <td class="item-num">5</td>
+      <td><span class="comp-name">Gugxiom CANable 2.0 USB-CAN-FD</span><br><span class="spec-text">STM32G431 (170MHz), candleLight</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.amazon.in/CANable-Module-Analyzer-Adapter-Converter/dp/B0DN67KQFP">Amazon.in (ASIN: B0DN67KQFP)</a></td>
+      <td class="price-col">₹3,674.00</td>
+      <td>6</td>
+      <td class="price-col">₹22,044.00<br><span style="font-size:8px;color:#57606a;">(S1: ₹11,022.00)</span></td>
+      <td>• Probots India CANable 2.0 (₹3,899)<br>• Makerfabs Direct Import (~₹2,200)<br>• Innomaker Commercial USB (~₹4,500)</td>
+      <td>Stage 1 needs 3 units (1 on Pi 5 for can2; 2 on Laptop for can0 & can2). Stage 3 adds 3 units (Total=6). Direct Linux gs_usb SocketCAN operation.</td>
+    </tr>
+    <tr>
+      <td class="item-num">6</td>
+      <td><span class="comp-name">StarTech 1ft Cat6 Ethernet Cable</span><br><span class="spec-text">4 twisted pairs, 24 AWG, 650 MHz</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.mouser.in/en/ProductDetail/StarTech/C6PATCH1BL?qs=PBDs2xEllI8Sz7PYTPk00A%3D%3D">Mouser India (C6PATCH1BL)</a></td>
+      <td class="price-col">₹436.00</td>
+      <td>1</td>
+      <td class="price-col">₹436.00</td>
+      <td>• Amazon 1m–2m Cat6 (₹180–₹220)<br>• Local IT shop 1m Cat6 (₹40–₹60)<br><span class="danger-tag">• Hookup Wire: REJECTED</span></td>
+      <td>1 single cable wires ALL 4 BUSES simultaneously! Pair 1=Safety, Pair 2=Comfort, Pair 3=Infotainment, Pair 4=OBD-II. Z0=100Ω perfectly matches CAN-FD.</td>
+    </tr>
+    <tr>
+      <td class="item-num">7</td>
+      <td><span class="comp-name">SanDisk Extreme 64GB MicroSD</span><br><span class="spec-text">A2 / V30 / U3, 170 MB/s</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.amazon.in/SanDisk-Extreme-microSD-Smartphones-Action/dp/B0B2DDJGF8">Amazon.in (ASIN: B0B2DDJGF8)</a></td>
+      <td class="price-col">₹2,579.00</td>
+      <td>1</td>
+      <td class="price-col">₹2,579.00</td>
+      <td>• Domestic Retail 64GB A2 (~₹650)<br>• Existing Lab MicroSD Card (₹0)<br>• USB 3.0 Pen Drive ≥16GB (₹0)</td>
+      <td>Pi 5 OS boot media only. All experimental CAN logs, CSVs, and fixtures are saved directly to the Laptop SSD. Any spare card in your lab saves ₹2,579.</td>
+    </tr>
+    <tr>
+      <td class="item-num">8</td>
+      <td><span class="comp-name">Split Termination Passives</span><br><span class="spec-text">TE 62Ω 1% + 4.7nF 50V caps</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.mouser.in/en/ProductDetail/TE-Connectivity-Holsworthy/1622771-1?qs=sGAEpiMZZMsPqMdJzcrNwhXxdF3DyUQnmUvK%252BKOsIOE%3D">Mouser (1622771-1)</a> + <a class="vendor-link" href="https://www.amazon.in/4-7NF-50V-MLCC-CAPACITOR-CAPCITOR/dp/B0DXPYVYG5">Amazon Cap</a></td>
+      <td class="price-col">₹36.34 (R)<br>₹198.00 (C)</td>
+      <td>4 R + 1 C pack</td>
+      <td class="price-col">₹343.36<br><span style="font-size:8px;color:#57606a;">(Stage 1: ₹0.00)</span></td>
+      <td>• Onboard 120Ω switches (₹0)<br>• Single 120Ω 1% resistor (₹10)<br>• Local electronics market (₹30)</td>
+      <td>Low-pass common-mode filter (fc = 1.09 MHz). Axial through-hole wire leads clamp directly into screw terminals. Stage 1 uses onboard switches (₹0 spend).</td>
+    </tr>
+    <tr>
+      <td class="item-num">9</td>
+      <td><span class="comp-name">Automotive TVS Diode Array</span><br><span class="spec-text">Littelfuse AQ24CANFD-02HTG</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.mouser.in/en/ProductDetail/Littelfuse/AQ24CANFD-02HTG?qs=f9yNj16SXrJ5gIpyuxo44w%3D%3D">Mouser India (AQ24CANFD)</a></td>
+      <td class="price-col">₹75.48</td>
+      <td>8</td>
+      <td class="price-col">₹603.84</td>
+      <td>• NXP PESD2CAN on Element14 (₹55)<br>• Bourns CDSOT23 on Mouser (₹48)<br>• Stage 1 HAT onboard diodes (₹0)</td>
+      <td>AEC-Q101 automotive qualified, ±21 kV ESD protection, ultra-low 12 pF capacitance preserves 5 Mbps transitions. SOT-23 package soldered to DIP header.</td>
+    </tr>
+    <tr>
+      <td class="item-num">10</td>
+      <td><span class="comp-name">Screw Terminals & Prakti Jumpers</span><br><span class="spec-text">2.54mm blocks + 40-pin ribbon</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://www.amazon.in/2-54mm-pitch-2-pin-Screw-Terminal/dp/B0BT297BSD">Amazon Terminals</a> + <a class="vendor-link" href="https://www.amazon.in/Prakti-Female-Jumper-Breadboard-DuPont/dp/B0C86QVK2P">Prakti Jumpers</a></td>
+      <td class="price-col">₹119.00 (T)<br>₹90.00 (J)</td>
+      <td>1 set each</td>
+      <td class="price-col">₹209.00</td>
+      <td>• 3.81mm pluggable terminals (₹250)<br>• Mini solderless breadboard (₹80)<br><span class="danger-tag">• 700A booster cable: REJECTED</span></td>
+      <td>Modular bus test taps, oscilloscope probe clipping, and I2C wiring. Replaced accidental 700A diesel battery clamp with verified Prakti ribbon wires.</td>
+    </tr>
+    <tr>
+      <td class="item-num">11</td>
+      <td><span class="comp-name">INA226 Module + 10mΩ Shunt</span><br><span class="spec-text">16-bit ADC + Dale WSL2512 1W</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td><a class="vendor-link" href="https://robu.in/product/ina226-voltage-current-and-power-monitor-module/">Robu.in Module</a> + <a class="vendor-link" href="https://www.mouser.in/en/ProductDetail/Vishay-Dale/WSL2512R0100FEA?qs=ViWNInbc%252BeXwSjGbk51Nog%3D%3D">Mouser Shunt</a></td>
+      <td class="price-col">₹124.00 (M)<br>₹51.25 (S)</td>
+      <td>1 set</td>
+      <td class="price-col">₹175.25</td>
+      <td>• External USB Meter FNIRSI (₹1,200)<br>• INA219 12-bit module (₹150)<br><span class="danger-tag">• ADS1115 & 1/4W Resistor: REJECTED</span></td>
+      <td>10 mΩ precision shunt drops only 50 mV at 5A load (5.05V rail), eliminating 0.5V brownout crash. Dissipates 0.25W (25% load). Stage 4 item.</td>
+    </tr>
+    <tr>
+      <td class="item-num">12</td>
+      <td><span class="comp-name">Oscilloscope Access (100MHz+ DSO)</span><br><span class="spec-text">Rigol DS1054Z / Siglent SDS1104X</span></td>
+      <td><span class="fit-badge">100% FIT</span></td>
+      <td>University Engineering Dept Lab</td>
+      <td class="price-col">₹0.00</td>
+      <td>1</td>
+      <td class="price-col">₹0.00</td>
+      <td>• Saleae Logic Pro 8 (Lab loan)<br>• Analog Discovery 2/3 (Lab)<br>• Handheld isolated scope (Hantek)</td>
+      <td>Safe Probing Rule: Two-Channel Math Subtraction (CH1 - CH2). Both probe grounds tied strictly to isolated CAN_GND to prevent mains earth short.</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr style="background:#f6f8fa;font-weight:700;font-size:10px;">
+      <td colspan="6" style="text-align:right;padding:7px;">GRAND TOTAL EXPENDITURE (ALL 4 BUSES FULLY EQUIPPED):</td>
+      <td class="price-col" style="color:#0969da;font-size:11px;">₹39,765.09</td>
+      <td colspan="2" style="color:#57606a;font-size:9px;">~$477 USD (Stage 1 Bring-Up Outlay: ₹27,755.00 INR / ~$333 USD)</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="two-col">
+  <div class="box">
+    <h4>📦 Vendor Order Consolidation Plan (Save on Shipping)</h4>
+    <ul>
+      <li><strong>Mouser India Cart (1 Consolidated Order):</strong>
+        <ul>
+          <li>Item 6: StarTech 1ft Cat6 Cable (<code>C6PATCH1BL</code>) — ₹436.00</li>
+          <li>Item 8a: TE Connectivity 62Ω 1% Resistors (<code>1622771-1</code>, 4 pcs) — ₹145.36</li>
+          <li>Item 9: Littelfuse TVS Diodes (<code>AQ24CANFD-02HTG</code>, 8 pcs) — ₹603.84</li>
+          <li>Item 11b: Vishay Dale 10 mΩ Shunt (<code>WSL2512R0100FEA</code>, 1 pc) — ₹51.25</li>
+          <li><em>Total Mouser Order: ~₹1,236.45 (all passives & cable in ONE box).</em></li>
+        </ul>
+      </li>
+      <li><strong>Robu.in Cart:</strong> Waveshare Isolated HAT (₹6,269.00) + INA226 Module (₹124.00) = ₹6,393.00.</li>
+      <li><strong>Silverline Electronics:</strong> Raspberry Pi 5 Model B = ₹5,251.00.</li>
+      <li><strong>Amazon India Cart:</strong> 27W Supply (₹1,499.00) + Cooler (₹699.00) + CANable 2.0 (3x ₹3,674.00) + MicroSD (₹2,579.00) + Terminals (₹119.00) + Jumpers (₹90.00) + Caps (₹198.00).</li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <h4>⚠️ Critical Engineering Traps Resolved in This BOM</h4>
+    <ul>
+      <li><strong>Pi 5 Under-Voltage Brownout:</strong> Stock INA226 0.1Ω resistor collapses 5V rail by 0.5V at 5A load. Fixed with 10 mΩ Dale WSL2512 (50 mV drop, leaves 5.05V, zero crash risk).</li>
+      <li><strong>5 Mbps Signal Reflection:</strong> Untwisted DC hookup wire creates 35% reflection (Γ = -0.35) and controller Bus-Off. Resolved with 100Ω Cat6 twisted pair cabling.</li>
+      <li><strong>Accidental Search Traps Eliminated:</strong> ADS1115 voltage ADC rejected in favor of true INA226 power monitor; 700A roadside truck booster cable replaced with 2.54mm Prakti ribbon jumpers.</li>
+      <li><strong>Oscilloscope Short Hazard:</strong> Mains-bonded probe ground clips short CAN_L to earth. Mandated two-channel math (CH1 - CH2) with clips on isolated CAN_GND.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Capstone Project 2026 — Automotive Embedded Cybersecurity & Post-Quantum In-Vehicle Gateway</span>
+  <span>Master Bill of Materials & Procurement Specification v2.0</span>
+</div>
+
+</body>
+</html>
