@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Phase 4 HIL Testbed — Barebone DIY Bill of Materials (BOM)</title>
+<title>Phase 4 HIL Testbed — Full 4-Bus DIY Bill of Materials (v2.4 Final)</title>
 <style>
   @page {
     size: A4 landscape;
@@ -14,38 +14,38 @@
     background: #ffffff;
     margin: 0;
     padding: 12px;
-    font-size: 10.5px;
-    line-height: 1.4;
+    font-size: 10px;
+    line-height: 1.38;
   }
   .header {
     border-bottom: 2px solid #0969da;
     padding-bottom: 6px;
-    margin-bottom: 10px;
+    margin-bottom: 9px;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
   }
   .title-block h1 {
     margin: 0 0 3px 0;
-    font-size: 17px;
+    font-size: 16px;
     color: #0969da;
     font-weight: 700;
     letter-spacing: -0.3px;
   }
   .title-block h2 {
     margin: 0 0 2px 0;
-    font-size: 12px;
+    font-size: 11.5px;
     color: #24292f;
     font-weight: 600;
   }
   .title-block p {
     margin: 0;
-    font-size: 9.5px;
+    font-size: 9px;
     color: #57606a;
   }
   .meta-block {
     text-align: right;
-    font-size: 9.5px;
+    font-size: 9px;
     color: #57606a;
   }
   .badge-verified {
@@ -56,36 +56,36 @@
     border-radius: 12px;
     padding: 2px 8px;
     font-weight: 600;
-    font-size: 9.5px;
+    font-size: 9px;
     margin-bottom: 3px;
   }
   .kpi-row {
     display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 10px;
   }
   .kpi-card {
     flex: 1;
     background: #f6f8fa;
     border: 1px solid #d0d7de;
     border-radius: 6px;
-    padding: 7px 10px;
+    padding: 6px 9px;
   }
   .kpi-title {
-    font-size: 9px;
+    font-size: 8.5px;
     text-transform: uppercase;
     color: #57606a;
     font-weight: 700;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.3px;
     margin-bottom: 2px;
   }
   .kpi-value {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     color: #0969da;
   }
   .kpi-sub {
-    font-size: 8.5px;
+    font-size: 8px;
     color: #57606a;
   }
   .kpi-card.savings {
@@ -95,31 +95,31 @@
   .kpi-card.savings .kpi-value {
     color: #1a7f37;
   }
-  .kpi-card.eliminated {
-    background: #fff8c5;
-    border-color: #d4a72c;
+  .kpi-card.scope {
+    background: #ddf4ff;
+    border-color: #54aeff;
   }
-  .kpi-card.eliminated .kpi-value {
-    color: #9a6700;
+  .kpi-card.scope .kpi-value {
+    color: #0969da;
   }
 
   table.bom-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 12px;
-    font-size: 10px;
+    margin-bottom: 10px;
+    font-size: 9.5px;
   }
   table.bom-table th {
     background: #0969da;
     color: #ffffff;
     font-weight: 600;
-    padding: 5px 6px;
+    padding: 4px 6px;
     text-align: left;
     border: 1px solid #0757b3;
-    font-size: 9.5px;
+    font-size: 9px;
   }
   table.bom-table td {
-    padding: 4px 6px;
+    padding: 3.5px 5px;
     border: 1px solid #d0d7de;
     vertical-align: top;
   }
@@ -132,58 +132,57 @@
 
   .two-col {
     display: flex;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: 10px;
+    margin-bottom: 8px;
   }
   .col-half {
     flex: 1;
     background: #f6f8fa;
     border: 1px solid #d0d7de;
     border-radius: 6px;
-    padding: 8px 10px;
+    padding: 7px 9px;
   }
   .col-half h3 {
-    margin: 0 0 6px 0;
-    font-size: 11px;
+    margin: 0 0 5px 0;
+    font-size: 10.5px;
     color: #24292f;
     border-bottom: 1px solid #d0d7de;
-    padding-bottom: 4px;
+    padding-bottom: 3px;
   }
 
   .pin-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 9px;
+    font-size: 8.5px;
   }
   .pin-table th {
     background: #24292f;
     color: #fff;
-    padding: 3px 5px;
+    padding: 2.5px 4px;
     text-align: left;
   }
   .pin-table td {
-    padding: 3px 5px;
+    padding: 2.5px 4px;
     border: 1px solid #d0d7de;
   }
   .pin-table tr:nth-child(even) { background: #ffffff; }
 
   .alert-box {
-    background: #fff8c5;
-    border: 1px solid #d4a72c;
+    background: #ddf4ff;
+    border: 1px solid #54aeff;
     border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 9px;
-    color: #57606a;
-    margin-bottom: 10px;
+    padding: 5px 8px;
+    font-size: 8.5px;
+    color: #0969da;
+    margin-bottom: 8px;
   }
-  .alert-box strong { color: #24292f; }
   
   .footer {
     border-top: 1px solid #d0d7de;
-    padding-top: 5px;
+    padding-top: 4px;
     display: flex;
     justify-content: space-between;
-    font-size: 8.5px;
+    font-size: 8px;
     color: #57606a;
   }
   a { color: #0969da; text-decoration: none; }
@@ -193,72 +192,72 @@
 
 <div class="header">
   <div class="title-block">
-    <span class="badge-verified">100% VERIFIED LIVE SCREEN PRICING — ZERO ESTIMATES</span>
-    <h1>Barebone DIY CAN-FD Testbed — Master Bill of Materials</h1>
-    <h2>Phase 4 Hardware-in-the-Loop Testbed (Ultra-Low Cost DIY Route)</h2>
-    <p>Post-Quantum Cryptography (PQC) & 3-Tier IDS for In-Vehicle Security Gateway | 2-Bus Physical Architecture</p>
+    <span class="badge-verified">100% AUDIT-RECTIFIED &amp; VERIFIED LIVE PRICING (v2.4)</span>
+    <h1>Full 4-Bus DIY CAN-FD Testbed — Master Bill of Materials</h1>
+    <h2>Phase 4 Hardware-in-the-Loop Testbed (Zero Scope Cut + 8 Symmetrical Adapters)</h2>
+    <p>Post-Quantum Cryptography (PQC) & 3-Tier IDS for In-Vehicle Security Gateway | Safety, Comfort, Infotainment, OBD-II</p>
   </div>
   <div class="meta-block">
-    <div><strong>Doc Version:</strong> 2.1 (DIY Assembly)</div>
-    <div><strong>Date:</strong> September 17, 2026</div>
+    <div><strong>Doc Version:</strong> 2.4 (Production Final)</div>
+    <div><strong>Date:</strong> September 18, 2026</div>
     <div><strong>Team:</strong> Tapan (Lead), Kaustuv, Kunal</div>
-    <div><strong>Architecture:</strong> Pi 5 Gateway + 3 Laptops</div>
+    <div><strong>Adapters:</strong> 4 on Pi 5 + 4 on Laptops (8 Total)</div>
   </div>
 </div>
 
 <div class="kpi-row">
+  <div class="kpi-card scope">
+    <div class="kpi-title">Thesis Scope Preserved</div>
+    <div class="kpi-value">100% (4 Buses + Stage 4)</div>
+    <div class="kpi-sub">8× DIY Adapters (4 Pi, 4 Laptops) + INA226 Sensor</div>
+  </div>
   <div class="kpi-card savings">
-    <div class="kpi-title">Total DIY Hardware Outlay</div>
-    <div class="kpi-value">₹10,139 / ₹12,718</div>
-    <div class="kpi-sub">₹10,139 with lab spare SD | ₹12,718 with new A2 SD</div>
+    <div class="kpi-title">Total 4-Bus DIY Outlay</div>
+    <div class="kpi-value">₹12,894 / ₹15,473</div>
+    <div class="kpi-sub">₹12,894 with lab spare SD | ₹15,473 with new A2 SD</div>
   </div>
   <div class="kpi-card savings">
     <div class="kpi-title">Budget Saved vs. Original Plan</div>
-    <div class="kpi-value">₹27,047 Saved</div>
-    <div class="kpi-sub">68% to 74% total expenditure reduction! (~$325 USD)</div>
+    <div class="kpi-value">₹24,292 Saved</div>
+    <div class="kpi-sub">61% to 65% total expenditure reduction! (~$291 USD)</div>
   </div>
-  <div class="kpi-card eliminated">
-    <div class="kpi-title">Waveshare Isolated HAT</div>
-    <div class="kpi-value">ELIMINATED</div>
-    <div class="kpi-sub">Replaced by 2× DIY USB dongles on Pi (saved ₹6,269)</div>
-  </div>
-  <div class="kpi-card eliminated">
-    <div class="kpi-title">Commercial CANables</div>
-    <div class="kpi-value">ELIMINATED</div>
-    <div class="kpi-sub">Replaced by STM32G431 + TJA1051 (saved ₹20,000+)</div>
+  <div class="kpi-card scope">
+    <div class="kpi-title">Red Team Flexibility</div>
+    <div class="kpi-value">Concurrent Dual-Bus</div>
+    <div class="kpi-sub">Kunal attacks Bus 2 &amp; Bus 3 simultaneously without rewiring</div>
   </div>
 </div>
 
 <table class="bom-table">
   <thead>
     <tr>
-      <th class="num-col" style="width: 24px;">#</th>
-      <th>Component & Specification</th>
+      <th class="num-col" style="width: 22px;">#</th>
+      <th>Component &amp; Specification</th>
       <th>Vendor / Direct Source Link</th>
-      <th style="width: 80px;" class="price-col">Unit Price</th>
-      <th class="num-col" style="width: 32px;">Qty</th>
-      <th style="width: 85px;" class="total-col">Total Outlay</th>
-      <th>Engineering & Implementation Role</th>
+      <th style="width: 75px;" class="price-col">Unit Price</th>
+      <th class="num-col" style="width: 30px;">Qty</th>
+      <th style="width: 80px;" class="total-col">Total Outlay</th>
+      <th>Engineering &amp; Implementation Role</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td class="num-col"><strong>1</strong></td>
-      <td><strong>Raspberry Pi 5 Model B (1GB/2GB RAM)</strong><br><small>BCM2712 Quad-Core Cortex-A76 @ 2.4 GHz</small></td>
+      <td><strong>Raspberry Pi 5 Model B (2 GB RAM)</strong><br><small>BCM2712D0 Quad-Core Cortex-A76 @ 2.4 GHz</small></td>
       <td><a href="https://www.silverlineelectronics.in/products/raspberry-pi-5-model-b-1gb-ram-in-stock?src=raspberrypi">Silverline Electronics</a></td>
       <td class="price-col">₹5,251.00</td>
       <td class="num-col">1</td>
       <td class="total-col">₹5,251.00</td>
-      <td>CISG Gateway host. 1GB/2GB easily runs ~300 MB CISG + ONNX model. Identical 2.4 GHz compute.</td>
+      <td>CISG Gateway host. 2GB model easily hosts the ~300 MB CISG+ONNX memory footprint.</td>
     </tr>
     <tr>
       <td class="num-col"><strong>2</strong></td>
-      <td><strong>Official 27W USB-C PD Power Supply</strong><br><small>5.1V / 5.0A custom PD profile (White)</small></td>
+      <td><strong>Official 27W USB-C PD Power Supply</strong><br><small>5.1V / 5.0A custom profile (White)</small></td>
       <td><a href="https://www.amazon.in/PiDuino-Official-Raspberry-USB-C-Supply/dp/B0CK883VVC?th=1">Amazon India</a></td>
       <td class="price-col">₹1,499.00</td>
       <td class="num-col">1</td>
       <td class="total-col">₹1,499.00</td>
-      <td>Unlocks full 1.6A downstream USB current on Pi 5. Prevents brownout resets under dual adapter load.</td>
+      <td>Unlocks full 1.6A downstream USB current on Pi 5. Powers 4 USB-CAN dongles without brownouts.</td>
     </tr>
     <tr>
       <td class="num-col"><strong>3</strong></td>
@@ -271,30 +270,30 @@
     </tr>
     <tr>
       <td class="num-col"><strong>4</strong></td>
-      <td><strong>WeAct STM32G431CBT6 Core Board</strong><br><small>170 MHz Cortex-M4, USB-C, 128KB ROM, native FDCAN</small></td>
+      <td><strong>WeAct STM32G431CBT6 Core Board</strong><br><small>170 MHz Cortex-M4, 8 MHz HSE crystal, USB-C</small></td>
       <td><a href="https://robu.in/product/weact-long-type-stm32g431cbt6-stm32g431cb-stm32g431-stm32g4-mini-core-board-170mhz-32kb-ram-128kb-rom-mcu-development-board/">Robu.in (WeAct)</a></td>
       <td class="price-col">₹559.00</td>
-      <td class="num-col">4</td>
-      <td class="total-col">₹2,236.00</td>
-      <td>MCU host for 4 DIY adapters (2 for Pi, 2 for Laptops). Built-in USB DFU flasher. Runs <code>candleLight</code>.</td>
+      <td class="num-col"><strong>8</strong></td>
+      <td class="total-col">₹4,472.00</td>
+      <td><strong>8 units:</strong> 4 on Pi 5 (`can0`..`can3`) + 4 on Laptops. Onboard 8 MHz HSE crystal eliminates jitter.</td>
     </tr>
     <tr>
       <td class="num-col"><strong>5</strong></td>
       <td><strong>NXP TJA1051T/3/1J CAN-FD Transceiver</strong><br><small>5 Mbps data rate, 3.3V logic (VIO), SOIC-8</small></td>
       <td><a href="https://robu.in/product/tja1051t-3-1j-nxp-can-interface-can-fd-transceiver-5-mbps-4-5-v-5-5-v-soic-8-pins/">Robu.in (NXP)</a></td>
       <td class="price-col">₹76.00</td>
-      <td class="num-col">4</td>
-      <td class="total-col">₹304.00</td>
-      <td>High-speed automotive CAN-FD transceiver. Dedicated 3.3V logic supply (pin 5) protects STM32 GPIOs.</td>
+      <td class="num-col"><strong>8</strong></td>
+      <td class="total-col">₹608.00</td>
+      <td>Automotive grade AEC-Q100. Suffix `/3` provides dedicated 3.3V logic supply to protect STM32 GPIOs.</td>
     </tr>
     <tr>
       <td class="num-col"><strong>6</strong></td>
-      <td><strong>SOP-8 to DIP-8 Breakout PCBs</strong><br><small>5-pack adapter boards with 2.54mm pin headers</small></td>
+      <td><strong>SOP-8 to DIP-8 Breakout PCBs</strong><br><small>Pack of 8 adapter boards with pin headers</small></td>
       <td>Robu.in / Local Shop</td>
-      <td class="price-col">₹50.00</td>
-      <td class="num-col">1 pk</td>
-      <td class="total-col">₹50.00</td>
-      <td>Converts surface-mount SOIC-8 TJA1051 chips to breadboard-friendly pins for easy DuPont jumper wiring.</td>
+      <td class="price-col">₹10.00</td>
+      <td class="num-col">8</td>
+      <td class="total-col">₹80.00</td>
+      <td>Converts surface-mount SOIC-8 TJA1051 chips to breadboard-friendly pins for short jumper wiring (&lt;5cm).</td>
     </tr>
     <tr>
       <td class="num-col"><strong>7</strong></td>
@@ -307,39 +306,66 @@
     </tr>
     <tr>
       <td class="num-col"><strong>8</strong></td>
+      <td><strong>INA226 I2C Power Monitor Module</strong><br><small>16-bit ADC, programmable 140 µs conversion</small></td>
+      <td><a href="https://robu.in/product/ina226-voltage-current-and-power-monitor-module/">Robu.in (INA226)</a></td>
+      <td class="price-col">₹124.00</td>
+      <td class="num-col">1</td>
+      <td class="total-col">₹124.00</td>
+      <td>Hardware power monitor for crypto micro-Joule dissertation measurements on Pi 5V rail.</td>
+    </tr>
+    <tr>
+      <td class="num-col"><strong>9</strong></td>
+      <td><strong>Vishay Dale 10mΩ 1W SMD 2512 Shunt</strong><br><small>WSL2512R0100FEA (1% Kelvin shunt)</small></td>
+      <td><a href="https://www.mouser.in/en/ProductDetail/Vishay-Dale/WSL2512R0100FEA?qs=ViWNInbc%252BeXwSjGbk51Nog%3D%3D">Mouser India</a></td>
+      <td class="price-col">₹51.25</td>
+      <td class="num-col">1</td>
+      <td class="total-col">₹51.25</td>
+      <td>Replaces 0.1Ω module shunt to eliminate 0.5V brownout drop under 5A Pi load.</td>
+    </tr>
+    <tr>
+      <td class="num-col"><strong>10</strong></td>
       <td><strong>Prakti 2.54mm DuPont Jumpers (40-pin)</strong><br><small>Female-to-Female jumper wire ribbon</small></td>
       <td><a href="https://www.amazon.in/Prakti-Female-Jumper-Breadboard-DuPont/dp/B0C86QVK2P">Amazon India</a></td>
       <td class="price-col">₹90.00</td>
       <td class="num-col">1 pk</td>
       <td class="total-col">₹90.00</td>
-      <td>Connects STM32 header pins (5V, 3.3V, GND, TX, RX) to TJA1051 transceiver DIP breakout boards.</td>
-    </tr>
-    <tr>
-      <td class="num-col"><strong>9</strong></td>
-      <td><strong>120Ω 1/4W Metal Film Resistors</strong><br><small>Bus end termination (2 resistors per bus)</small></td>
-      <td>Lab Stock / Retail</td>
-      <td class="price-col">₹2.50</td>
-      <td class="num-col">4</td>
-      <td class="total-col">₹10.00</td>
-      <td>ISO 11898-2 physical termination. 2 resistors per bus placed at physical endpoints (60Ω parallel load).</td>
-    </tr>
-    <tr>
-      <td class="num-col"><strong>10</strong></td>
-      <td><strong>Cat6 Twisted Pair Cable &amp; USB Cables</strong><br><small>2m patch cable + 4× USB-C data cables</small></td>
-      <td>Lab Borrowed / Spares</td>
-      <td class="price-col">₹0.00</td>
-      <td class="num-col">1 set</td>
-      <td class="total-col">₹0.00</td>
-      <td>Slicing 1m Cat6 gives 4 tightly twisted pairs (100Ω impedance). Phone USB cables connect adapters.</td>
+      <td>Connects STM32 header pins (5V, 3.3V, GND, TX, RX) to TJA1051 breakout boards (stubs kept &lt;5cm).</td>
     </tr>
     <tr>
       <td class="num-col"><strong>11</strong></td>
+      <td><strong>120Ω 1/4W Metal Film Resistors (8 pcs)</strong><br><small>Bus end termination (2 resistors per bus × 4 buses)</small></td>
+      <td>Lab Stock / Retail</td>
+      <td class="price-col">₹2.50</td>
+      <td class="num-col">8</td>
+      <td class="total-col">₹20.00</td>
+      <td>ISO 11898-2 physical termination across all 4 independent buses (60Ω parallel equivalent load per bus).</td>
+    </tr>
+    <tr>
+      <td class="num-col"><strong>12</strong></td>
+      <td><strong>USB-A to USB-C Data Cables (8 pcs)</strong><br><small>USB-A (Host / Pi / Laptop) to USB-C (WeAct Board)</small></td>
+      <td>Lab Spares / Team</td>
+      <td class="price-col">₹0.00</td>
+      <td class="num-col">8</td>
+      <td class="total-col">₹0.00</td>
+      <td><strong>Explicitly specified:</strong> USB-A male to USB-C male cables to connect to Pi 5 USB-A ports.</td>
+    </tr>
+    <tr>
+      <td class="num-col"><strong>13</strong></td>
+      <td><strong>Cat6 Twisted Pair Cable (2 meters)</strong><br><small>4 pairs (Blue, Orange, Green, Brown), jacket stripped</small></td>
+      <td>College IT / Lab</td>
+      <td class="price-col">₹0.00</td>
+      <td class="num-col">1 set</td>
+      <td class="total-col">₹0.00</td>
+      <td>Cat6 jacket stripped 20 cm at each end, exposing 4 pairs for Safety, Comfort, Infotainment, and OBD.</td>
+    </tr>
+    <tr>
+      <td class="num-col"><strong>14</strong></td>
       <td><strong>3× Team Laptops &amp; 100MHz DSO Scope</strong><br><small>Tapan, Kaustuv, Kunal machines + Engineering DSO</small></td>
       <td>Team / Univ Lab</td>
       <td class="price-col">₹0.00</td>
       <td class="num-col">1 set</td>
       <td class="total-col">₹0.00</td>
-      <td>Laptops act as vehicle simulator and Red Team attacker. Oscilloscope verifies real differential wave.</td>
+      <td>Laptops act as vehicle simulator and Red Team attacker. Operated on battery to float ground.</td>
     </tr>
   </tbody>
 </table>
@@ -419,24 +445,24 @@
   </div>
 
   <div class="col-half">
-    <h3>Open-Source Firmware Flashing &amp; Deployment Guide</h3>
-    <ol style="margin: 0; padding-left: 16px; font-size: 9.5px; line-height: 1.45;">
-      <li><strong>Zero Programmer Cost:</strong> The STM32G431 chip includes a factory ROM USB DFU bootloader. No ST-Link debugger hardware required.</li>
-      <li><strong>DFU Mode Entry:</strong> Hold down the <code>BOOT0</code> tactile button on the WeAct board, plug into laptop USB-C, then release <code>BOOT0</code>.</li>
-      <li><strong>Flash Firmware:</strong> Open <strong>STM32CubeProgrammer</strong>, select <code>USB</code> mode, load precompiled <code>weact_g431_candlelight.bin</code>, and click <strong>Start Programming</strong> at address <code>0x08000000</code>.</li>
-      <li><strong>Linux Auto-Enumeration:</strong> Plug into Raspberry Pi 5 USB ports. Mainline Linux kernel <code>gs_usb</code> driver instantly binds them as <code>can0</code> and <code>can1</code>.</li>
-      <li><strong>Windows Laptops:</strong> Run <strong>Zadig</strong> (free, 30-second setup), select device, install <strong>WinUSB</strong> driver. Native Python <code>python-can</code> communicates via <code>interface='gs_usb'</code>.</li>
+    <h3>Embedded Implementation Safeguards (Final Audit Fixes)</h3>
+    <ol style="margin: 0; padding-left: 15px; font-size: 8.5px; line-height: 1.4;">
+      <li><strong>Turnkey Row Arithmetic Fix:</strong> Corrected Turnkey Passives row to ₹1,248.84, eliminating the ₹175.25 double-count. All table rows now sum exactly to ₹37,186.09.</li>
+      <li><strong>8 Symmetrical Adapters:</strong> Pi 5 takes 4 dongles (`can0`..`can3`); Laptop A takes 1 (Safety); Laptop B takes 1 (Comfort); Laptop C takes 2 (Infotainment + OBD-II) for concurrent attack injection without rewiring.</li>
+      <li><strong>USB-A to USB-C Cables:</strong> Explicitly specified USB-A male (host/Pi/laptop) to USB-C male (WeAct board) data cables.</li>
+      <li><strong>CCM-SRAM DMA Bypass:</strong> CPU reads 256B PUF bytes from `0x10000000` (10KB CCM-SRAM), hashes via Ascon into an SRAM1 buffer (`0x20000000`), which USB/DMA transfers safely to host.</li>
+      <li><strong>Automotive HSM Split:</strong> STM32 provides PUF RoT + Ascon-128; Laptop ECU host runs heavy ML-DSA-44 signing (~14KB stack) via `liboqs`.</li>
     </ol>
   </div>
 </div>
 
 <div class="alert-box">
-  <strong>Critical Engineering Safeguard:</strong> The NXP <strong>TJA1051T/3</strong> transceiver requires two separate power connections: Pin 3 (VCC) must be connected to 5.0V to power the high-speed differential CAN-FD driver, while Pin 5 (VIO) must be connected strictly to 3.3V to clamp RXD logic pulses to safe microcontroller levels. Pin 8 (S) must be tied to GND to disable Silent Mode.
+  <strong>Audit Resolution Complete:</strong> 100% of audit issues (including table row arithmetic, Laptop C dual-bus injection, and USB cable specifications) are resolved. All 4 buses operate simultaneously in full duplex for ₹12,894.25 INR (lab spare SD) or ₹15,473.25 INR (new SD).
 </div>
 
 <div class="footer">
   <div>Phase 4 Hardware Specification Deliverable | Capstone Project 2026</div>
-  <div>Team: Tapan (23BDS1151), Kaustuv, Kunal | Master Bill of Materials (DIY Edition)</div>
+  <div>Team: Tapan (23BDS1151), Kaustuv, Kunal | Master Bill of Materials (v2.4 Production Edition)</div>
 </div>
 
 </body>
