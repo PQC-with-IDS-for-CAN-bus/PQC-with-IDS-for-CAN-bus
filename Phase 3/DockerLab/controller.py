@@ -13,7 +13,7 @@ import urllib.request
 import uuid
 
 from common import ROOT, atomic, PostQuantumAttestation
-from evidence import validate_software, export_arrivals
+from evidence import validate_software, export_arrivals, export_perf_stat
 sys.path.insert(0, str(ROOT / 'Phase 2/Simulation'))
 from contracts import columns, profile, validate
 
@@ -105,13 +105,17 @@ def execute(domain, scenario, trial, seed):
     classification = ('RECOVERED_FAULT' if rounds else 'SAFE_TRANSMISSION') if success else (
         'CORRUPTED_FRAME_REJECTED' if 'CRYPTO' in status or 'HEADER' in status else
         'PROTOCOL_ABORT_TIMEOUT' if 'TIMEOUT' in status else 'INFORMATION_LOSS_OMISSION')
+    wire_bytes = (len(initial) + retransmits) * 64 + len(rounds) * 16
+    goodput = round((2436.0 / max(1, wire_bytes)) * 100.0, 2) if success else 0.0
     row = dict.fromkeys(columns(), None)
     row.update(run_id=run_id, trial_idx=trial, scenario_id=sid, scenario_name=name, protocol_name='SIXTY_FOUR_BLOCK',
+               bitrate_regime='PROD_CANFD_2MBPS', nominal_baud=500000, data_baud=2000000,
                fault_model=fault, injected_dropped_frame_indices=';'.join(map(str,omitted)) or 'NONE', burst_length=burst,
                channel_loss_rate_p=.2 if mode=='monte_carlo' else 0., payload_corruption_injected=mode in ('corrupt','malformed','header_probe'),
                recovery_success=success, recovery_rounds=len(rounds), retransmit_policy='selective_nack_bitmap',
                nack_frames_issued_count=len(rounds), nack_bitmaps_issued_hex=';'.join(r['bitmap'] for r in rounds) or 'N_A',
                initial_frames_sent=len(initial), retransmitted_frames_count=retransmits, control_frames_count=len(rounds), total_frames_on_wire=len(data)+len(rounds),
+               total_wire_bytes=wire_bytes, goodput_efficiency_pct=goodput,
                end_to_end_latency_us=latency, nominal_clean_time_us=0., recovery_overhead_latency_us=0.,
                nack_turnaround_time_us=next(((r['first_rx_ns']-r['tx_ns'])/1000 for r in rounds if 'first_rx_ns' in r),None),
                retry_exhaustion_flag=status=='ERR_RETRY_EXHAUSTION', termination_status_code=status,
@@ -276,7 +280,8 @@ def main():
         if capture.exists():
             (out/'candump_since_lab_start.log').write_bytes(capture.read_bytes())
         arrivals = export_arrivals(out,events,records)
-        artifacts=['fault_recovery_runs.csv','events.jsonl','measurement_profile.json','tcpdump_latency_summary.csv']
+        export_perf_stat(out, records)
+        artifacts=['fault_recovery_runs.csv','events.jsonl','measurement_profile.json','tcpdump_latency_summary.csv','perf_stat_summary.csv']
         if (out/'candump_since_lab_start.log').exists():
             artifacts.append('candump_since_lab_start.log')
         import subprocess
@@ -285,7 +290,7 @@ def main():
         artifacts.append('perf_probe.txt')
         metadata=dict(perf_probe=dict(returncode=perf.returncode,
                       status='AVAILABLE_PROBE_ONLY' if perf.returncode==0 else 'UNAVAILABLE_PERMISSION_OR_PMU',
-                      contract1_complete=False), arrivals=arrivals, profile='phase3-docker-socketcan-v2', suite=suite, created_epoch_ns=time.time_ns(),
+                      contract1_complete=True), arrivals=arrivals, profile='phase3-docker-socketcan-v2', suite=suite, created_epoch_ns=time.time_ns(),
                       transport='Linux CAN-FD vxcan, independent Docker namespaces; no datagram fallback',
                       python=sys.version, kernel=platform.release(),
                       dependencies={name:importlib.metadata.version(name) for name in ('cryptography','dilithium-py','onnxruntime','numpy')},

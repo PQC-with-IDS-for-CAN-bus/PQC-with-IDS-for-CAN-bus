@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PQC & IDS In-Vehicle CAN-FD Security Architecture Digital Twin</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(1.08); }
+    }
+    @keyframes wire-flow {
+      from { stroke-dashoffset: 40; }
+      to { stroke-dashoffset: 0; }
+    }
+    .wire-active {
+      stroke-dasharray: 6 6;
+      animation: wire-flow 1s linear infinite;
+    }
+    .radar-scan {
+      transform-origin: center;
+      animation: rotate 4s linear infinite;
+    }
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.4); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.8); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col font-sans select-none overflow-x-hidden">
+
+  <!-- TOP APP BAR -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-6 py-3 flex items-center justify-between z-30 sticky top-0">
+    <div class="flex items-center space-x-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="font-bold text-lg tracking-wide text-white">AUTONOMOUS CYBER-PHYSICAL DIGITAL TWIN</h1>
+          <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30">CAN FD 2.0 Mbps</span>
+          <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">NIST PQC Level 3</span>
+          <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30">ASIL-D Compliant</span>
+        </div>
+        <p class="text-xs text-slate-400">Post-Quantum Cryptography (Kyber-512 / Dilithium-2) & 3-Tier Stateful ML-IDS Gateway</p>
+      </div>
+    </div>
+
+    <!-- LIVE METRIC CHIPS -->
+    <div class="flex items-center space-x-6 text-xs">
+      <div class="text-right">
+        <span class="text-slate-400 block text-[11px]">FTTI Safety Budget</span>
+        <span class="font-mono font-bold text-emerald-400 text-sm">42.82 ms <span class="text-slate-500 font-normal">/ 50.0 ms</span></span>
+      </div>
+      <div class="h-8 w-[1px] bg-slate-800"></div>
+      <div class="text-right">
+        <span class="text-slate-400 block text-[11px]">CISG Wire Latency</span>
+        <span class="font-mono font-bold text-cyan-400 text-sm" id="wire-latency-val">1.23 µs <span class="text-slate-500 font-normal">(Wire-Rate)</span></span>
+      </div>
+      <div class="h-8 w-[1px] bg-slate-800"></div>
+      <div class="text-right">
+        <span class="text-slate-400 block text-[11px]">Major Page Faults</span>
+        <span class="font-mono font-bold text-emerald-400 text-sm">0 <span class="text-emerald-500 font-normal">PASS</span></span>
+      </div>
+      <div class="h-8 w-[1px] bg-slate-800"></div>
+      <div>
+        <span class="text-slate-400 block text-[11px]">Quarantine Ingress</span>
+        <span class="font-semibold text-emerald-400 flex items-center gap-1.5" id="quarantine-status-pill">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Mode B (Stateful ZOH)
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD LAYOUT -->
+  <div class="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden">
+
+    <!-- LEFT: 2D VEHICLE CANVAS & REAL-TIME INTERACTIVE BLUEPRINT (8 Cols) -->
+    <div class="col-span-12 xl:col-span-8 flex flex-col space-y-4">
+
+      <!-- THE "WATCH" (TIME DILATION & CHRONOGRAPH CONTROLLER) -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl flex items-center justify-between backdrop-blur-md">
+        
+        <!-- Precision Stopwatch & Timing Engine -->
+        <div class="flex items-center space-x-4">
+          <div class="relative w-14 h-14 rounded-full bg-slate-950 border-2 border-cyan-500/50 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+            <svg class="absolute inset-0 w-full h-full text-cyan-500/20" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="4 8"/>
+            </svg>
+            <div class="text-center font-mono">
+              <span class="text-[9px] text-cyan-400 uppercase tracking-tighter block leading-none">WATCH</span>
+              <span class="text-xs font-bold text-white block mt-0.5" id="watch-speed-badge">1.0x</span>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center space-x-3 font-mono">
+              <div class="text-xl font-bold text-white tracking-wider" id="sim-clock">00:00.000</div>
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono" id="sim-frame-counter">FRAME: 00000</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5">Physical Kinematics Transmission Clock & Wire-Speed Slow-Motion Engine</p>
+          </div>
+        </div>
+
+        <!-- Time Dilation Multiplier Slider & Stepping -->
+        <div class="flex items-center space-x-3">
+          <div class="flex flex-col space-y-1">
+            <div class="flex justify-between text-[11px] font-mono">
+              <span class="text-slate-400">SLOW-MOTION TIME WARP</span>
+              <span class="text-cyan-400 font-bold" id="speed-slider-label">1.00x (Real-Time 100 Hz)</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition" onclick="setSpeed(0.05)">0.05x Ultra Slow</button>
+              <button class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition" onclick="setSpeed(0.20)">0.20x</button>
+              <button class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition" onclick="setSpeed(0.50)">0.50x</button>
+              <button class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition active" id="btn-speed-1" onclick="setSpeed(1.0)">1.0x</button>
+              <input type="range" id="time-slider" min="0.02" max="2.0" step="0.02" value="1.0" class="w-32 accent-cyan-500 cursor-pointer" oninput="onSliderChange(this.value)">
+            </div>
+          </div>
+
+          <div class="h-10 w-[1px] bg-slate-800 mx-2"></div>
+
+          <!-- Play / Pause / Step Controls -->
+          <div class="flex items-center space-x-1.5">
+            <button id="btn-play-pause" onclick="togglePlayPause()" class="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 transition transform active:scale-95" title="Play / Pause">
+              <svg id="icon-pause" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+              <svg id="icon-play" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+            </button>
+            <button onclick="stepSingleFrame()" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center justify-center transition" title="Step 1 CAN Frame">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="resetSimulation()" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center justify-center transition" title="Reset Simulation">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2D VEHICLE SCHEMATIC CANVAS (TOP-DOWN CAR CUTAWAY) -->
+      <div class="relative bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl flex-1 flex flex-col items-center justify-center overflow-hidden min-h-[500px]">
+        
+        <!-- Architectural Bus Domain Legend -->
+        <div class="absolute top-4 left-4 bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 text-xs backdrop-blur-sm z-20 space-y-2">
+          <div class="font-bold text-slate-300 text-[11px] tracking-wider uppercase flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span> CAN FD Network Topology
+          </div>
+          <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] font-mono">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded bg-orange-500 shadow-sm shadow-orange-500/50"></span>
+              <span class="text-slate-300">Domain 1: Powertrain (0x0D0)</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
+              <span class="text-slate-300">Domain 2: Chassis/Wheels (0x6E0)</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
+              <span class="text-slate-300">Domain 3: Body/Coolant (0x4E7)</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded bg-purple-400 shadow-sm shadow-purple-400/50"></span>
+              <span class="text-slate-300">Domain 4: Infotainment/OBD-II</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hover Instructions Prompt -->
+        <div class="absolute top-4 right-4 bg-blue-950/40 border border-blue-800/40 rounded-xl px-3 py-1.5 text-[11px] text-blue-300 flex items-center space-x-2 z-20 backdrop-blur-sm">
+          <svg class="w-4 h-4 text-blue-400 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+          <span>Hover over any car component or wire to inspect state & defense</span>
+        </div>
+
+        <!-- SVG 2D VEHICLE CANVAS -->
+        <svg id="vehicle-svg" class="w-full h-full max-h-[580px]" viewBox="0 0 960 520">
+          <defs>
+            <!-- Glow Filters -->
+            <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <filter id="glow-emerald" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <filter id="glow-purple" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            
+            <!-- Radial Gradients -->
+            <radialGradient id="gateway-core" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8"/>
+              <stop offset="70%" stop-color="#0284c7" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#0f172a" stop-opacity="0.9"/>
+            </radialGradient>
+          </defs>
+
+          <!-- CAR BODY SHADOW & AIRFLOW -->
+          <ellipse cx="480" cy="260" rx="430" ry="190" fill="#030712" opacity="0.6"/>
+
+          <!-- 2D VEHICLE CHASSIS BLUEPRINT (AERODYNAMIC SILHOUETTE) -->
+          <g id="car-chassis" opacity="0.95">
+            <!-- Outer Body Shell -->
+            <path d="M 120 260 
+                     C 120 180, 160 110, 260 100 
+                     C 380 90, 520 90, 680 105 
+                     C 790 115, 840 180, 840 260 
+                     C 840 340, 790 405, 680 415 
+                     C 520 430, 380 430, 260 420 
+                     C 160 410, 120 340, 120 260 Z" 
+                  fill="#090d16" stroke="#1e293b" stroke-width="3"/>
+
+            <!-- Windshield & Greenhouse (Glass Cabin) -->
+            <path d="M 330 140 
+                     L 470 145 
+                     C 590 148, 620 180, 620 260 
+                     C 620 340, 590 372, 470 375 
+                     L 330 380 
+                     C 300 330, 300 190, 330 140 Z" 
+                  fill="#0d1527" stroke="#334155" stroke-width="2" opacity="0.8"/>
+
+            <!-- Rear Window Glass -->
+            <path d="M 640 160 L 710 175 C 740 210, 740 310, 710 345 L 640 360 Z" fill="#0b1120" stroke="#334155" stroke-width="1.5"/>
+
+            <!-- Front Hood & Grille Accent -->
+            <path d="M 125 210 Q 115 260 125 310" stroke="#38bdf8" stroke-width="2" fill="none" opacity="0.4"/>
+            <!-- Headlights -->
+            <polygon points="140,125 180,120 165,150" fill="#38bdf8" opacity="0.5"/>
+            <polygon points="140,395 180,400 165,370" fill="#38bdf8" opacity="0.5"/>
+            <!-- Taillights -->
+            <polygon points="820,150 835,170 825,190" fill="#ef4444" opacity="0.6"/>
+            <polygon points="820,370 835,350 825,330" fill="#ef4444" opacity="0.6"/>
+          </g>
+
+          <!-- 4 ACTIVE WHEEL ASSEMBLIES (TIRES, RIMS, SPEED SENSORS) -->
+          <!-- Front Left Wheel (FL) -->
+          <g id="wheel-fl" class="cursor-pointer transition-transform hover:scale-105" onmouseenter="showTooltip('wheel-fl')" onmouseleave="hideTooltip()">
+            <rect x="230" y="55" width="90" height="42" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <rect x="240" y="65" width="70" height="22" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+            <!-- Brake Caliper & Hall Effect Sensor Pulse -->
+            <circle cx="275" cy="76" r="6" fill="#38bdf8" filter="url(#glow-cyan)"/>
+            <text x="275" y="45" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">WHEEL FL</text>
+            <text x="275" y="115" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="middle" id="val-fl-spd">84.2 km/h</text>
+          </g>
+
+          <!-- Front Right Wheel (FR) -->
+          <g id="wheel-fr" class="cursor-pointer transition-transform hover:scale-105" onmouseenter="showTooltip('wheel-fr')" onmouseleave="hideTooltip()">
+            <rect x="230" y="423" width="90" height="42" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <rect x="240" y="433" width="70" height="22" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+            <circle cx="275" cy="444" r="6" fill="#38bdf8" filter="url(#glow-cyan)"/>
+            <text x="275" y="482" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">WHEEL FR</text>
+            <text x="275" y="415" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="middle" id="val-fr-spd">84.1 km/h</text>
+          </g>
+
+          <!-- Rear Left Wheel (RL) -->
+          <g id="wheel-rl" class="cursor-pointer transition-transform hover:scale-105" onmouseenter="showTooltip('wheel-rl')" onmouseleave="hideTooltip()">
+            <rect x="630" y="55" width="90" height="42" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <rect x="640" y="65" width="70" height="22" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+            <circle cx="675" cy="76" r="6" fill="#38bdf8" filter="url(#glow-cyan)"/>
+            <text x="675" y="45" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">WHEEL RL</text>
+            <text x="675" y="115" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="middle" id="val-rl-spd">84.0 km/h</text>
+          </g>
+
+          <!-- Rear Right Wheel (RR) -->
+          <g id="wheel-rr" class="cursor-pointer transition-transform hover:scale-105" onmouseenter="showTooltip('wheel-rr')" onmouseleave="hideTooltip()">
+            <rect x="630" y="423" width="90" height="42" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <rect x="640" y="433" width="70" height="22" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+            <circle cx="675" cy="444" r="6" fill="#38bdf8" filter="url(#glow-cyan)"/>
+            <text x="675" y="482" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">WHEEL RR</text>
+            <text x="675" y="415" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="middle" id="val-rr-spd">84.0 km/h</text>
+          </g>
+
+          <!-- PHYSICAL SENSORS & MECHANICAL COMPONENTS -->
+          <!-- 1. Engine Block & Speedometer Generator (Domain 1) -->
+          <g id="component-engine" class="cursor-pointer" onmouseenter="showTooltip('component-engine')" onmouseleave="hideTooltip()">
+            <rect x="180" y="210" width="80" height="100" rx="10" fill="#1c1917" stroke="#f97316" stroke-width="2"/>
+            <path d="M 195 230 L 245 230 M 195 250 L 245 250 M 195 270 L 245 270 M 195 290 L 245 290" stroke="#78716c" stroke-width="3"/>
+            <circle cx="220" cy="260" r="14" fill="#f97316" filter="url(#glow-orange)" opacity="0.8"/>
+            <text x="220" y="200" fill="#f97316" font-size="11" font-weight="bold" font-family="monospace" text-anchor="middle">ENGINE / POWERTRAIN</text>
+            <text x="220" y="325" fill="#fdba74" font-size="10" font-family="monospace" text-anchor="middle" id="val-engine-status">620 RPM | 85 km/h</text>
+          </g>
+
+          <!-- 2. Radiator & Engine Coolant Temp Sensor (Domain 3) -->
+          <g id="component-coolant" class="cursor-pointer" onmouseenter="showTooltip('component-coolant')" onmouseleave="hideTooltip()">
+            <rect x="135" y="235" width="22" height="50" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="1.5"/>
+            <circle cx="146" cy="260" r="5" fill="#10b981" filter="url(#glow-emerald)"/>
+            <text x="146" y="228" fill="#10b981" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">COOLANT</text>
+            <text x="146" y="300" fill="#6ee7b7" font-size="9" font-family="monospace" text-anchor="middle" id="val-coolant-temp">88.5°C</text>
+          </g>
+
+          <!-- 3. Cockpit Controls: Steering Wheel & Hydraulic Brake Transducer (Domain 2) -->
+          <g id="component-steering" class="cursor-pointer" onmouseenter="showTooltip('component-steering')" onmouseleave="hideTooltip()">
+            <circle cx="370" cy="210" r="18" fill="none" stroke="#38bdf8" stroke-width="3"/>
+            <circle cx="370" cy="210" r="4" fill="#38bdf8"/>
+            <line x1="352" y1="210" x2="388" y2="210" stroke="#38bdf8" stroke-width="2"/>
+            <text x="370" y="185" fill="#38bdf8" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">STEERING (0x354)</text>
+            <text x="370" y="238" fill="#93c5fd" font-size="9" font-family="monospace" text-anchor="middle">32,768 (0.0°)</text>
+          </g>
+
+          <g id="component-brake" class="cursor-pointer" onmouseenter="showTooltip('component-brake')" onmouseleave="hideTooltip()">
+            <rect x="350" y="295" width="16" height="24" rx="3" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+            <circle cx="358" cy="307" r="4" fill="#f43f5e"/>
+            <text x="358" y="333" fill="#f43f5e" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">BRAKE</text>
+            <text x="358" y="345" fill="#fda4af" font-size="9" font-family="monospace" text-anchor="middle">128 bar</text>
+          </g>
+
+          <!-- 4. Infotainment Head Unit & Telematics TCU (Domain 4) -->
+          <g id="component-ivi" class="cursor-pointer" onmouseenter="showTooltip('component-ivi')" onmouseleave="hideTooltip()">
+            <rect x="520" y="235" width="55" height="50" rx="6" fill="#1e1b4b" stroke="#a855f7" stroke-width="1.5"/>
+            <rect x="526" y="241" width="43" height="38" rx="3" fill="#0f172a" stroke="#6b21a8" stroke-width="1"/>
+            <path d="M 535 260 L 545 252 L 555 264" stroke="#c084fc" stroke-width="2" fill="none"/>
+            <text x="548" y="226" fill="#c084fc" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">INFOTAINMENT (IVI)</text>
+            <text x="548" y="300" fill="#e9d5ff" font-size="9" font-family="monospace" text-anchor="middle">HUD Active</text>
+          </g>
+
+          <!-- 5. OBD-II Diagnostic Port & Attacker Tap (Vulnerability Vector) -->
+          <g id="component-attacker" class="cursor-pointer" onmouseenter="showTooltip('component-attacker')" onmouseleave="hideTooltip()">
+            <rect x="580" y="320" width="34" height="22" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="2" stroke-dasharray="2 2"/>
+            <circle cx="597" cy="331" r="5" fill="#ef4444" filter="url(#glow-red)"/>
+            <text x="597" y="356" fill="#ef4444" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">OBD-II / ATTACKER</text>
+            <text x="597" y="368" fill="#fca5a5" font-size="9" font-family="monospace" text-anchor="middle" id="attacker-mode-label">STANDBY</text>
+          </g>
+
+          <!-- PHYSICAL CAN WIRING HARNESSES (TRACES TO CENTRAL GATEWAY) -->
+          <!-- Domain 1: Powertrain Bus (Engine -> Gateway) -->
+          <path id="wire-d1" d="M 260 260 L 420 260" stroke="#f97316" stroke-width="3" fill="none" class="wire-active"/>
+          
+          <!-- Domain 2: Chassis Bus (Wheel Sensors & Steering/Brake -> Gateway) -->
+          <path id="wire-d2-fl" d="M 275 97 L 275 140 L 420 245" stroke="#38bdf8" stroke-width="2" fill="none" class="wire-active"/>
+          <path id="wire-d2-fr" d="M 275 423 L 275 380 L 420 275" stroke="#38bdf8" stroke-width="2" fill="none" class="wire-active"/>
+          <path id="wire-d2-rl" d="M 675 97 L 675 140 L 480 245" stroke="#38bdf8" stroke-width="2" fill="none" class="wire-active"/>
+          <path id="wire-d2-rr" d="M 675 423 L 675 380 L 480 275" stroke="#38bdf8" stroke-width="2" fill="none" class="wire-active"/>
+          
+          <!-- Domain 3: Coolant Bus (Radiator -> Gateway) -->
+          <path id="wire-d3" d="M 157 260 L 180 260" stroke="#10b981" stroke-width="2.5" fill="none" class="wire-active"/>
+          
+          <!-- Domain 4: Infotainment & Attacker Bus (Gateway -> IVI & OBD-II) -->
+          <path id="wire-d4" d="M 480 260 L 520 260" stroke="#a855f7" stroke-width="3" fill="none" class="wire-active"/>
+          <path id="wire-d4-atk" d="M 520 260 L 580 320" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="3 3" fill="none"/>
+
+          <!-- CENTRAL INTELLIGENT SECURITY GATEWAY (CISG CORE) -->
+          <g id="cisg-gateway" class="cursor-pointer" onmouseenter="showTooltip('cisg-gateway')" onmouseleave="hideTooltip()">
+            <!-- Pulsing Halo -->
+            <circle cx="450" cy="260" r="44" fill="url(#gateway-core)" stroke="#0284c7" stroke-width="2.5"/>
+            <circle cx="450" cy="260" r="48" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="8 4" class="radar-scan"/>
+            
+            <!-- Gateway Chip Body -->
+            <rect x="432" y="242" width="36" height="36" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="2"/>
+            <path d="M 440 250 L 460 250 M 440 260 L 460 260 M 440 270 L 460 270" stroke="#38bdf8" stroke-width="2"/>
+            
+            <!-- Status Beacon -->
+            <circle cx="450" cy="260" r="4" fill="#10b981" id="gateway-beacon"/>
+            
+            <text x="450" y="210" fill="#38bdf8" font-size="12" font-weight="extrabold" font-family="monospace" text-anchor="middle">CISG GATEWAY</text>
+            <text x="450" y="320" fill="#7dd3fc" font-size="10" font-family="monospace" text-anchor="middle">ASCON-128 | 3-TIER IDS</text>
+          </g>
+
+          <!-- DYNAMIC SIGNAL PACKETS (MOVING SVG TOKENS) -->
+          <g id="packet-container"></g>
+        </svg>
+
+        <!-- FLOATING REAL-TIME HOVER HUD CARD -->
+        <div id="hover-card" class="absolute bottom-4 left-4 right-4 bg-slate-900/95 border border-cyan-500/40 rounded-xl p-4 shadow-2xl backdrop-blur-md transition-all duration-200 pointer-events-none opacity-0 transform translate-y-2 z-30">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" id="hud-domain">DOMAIN 1: POWERTRAIN</span>
+                <h3 class="text-sm font-bold text-white tracking-wide" id="hud-title">Engine Speed & RPM Generator</h3>
+              </div>
+              <p class="text-xs text-slate-300 mt-1" id="hud-desc">Vehicle physical sensor generating high-frequency kinematic updates over CAN-FD.</p>
+            </div>
+            <div class="text-right font-mono text-xs">
+              <span class="text-slate-400 block text-[10px]">CURRENT CAN-FD FRAME</span>
+              <span class="text-cyan-400 font-bold" id="hud-can-id">0x0D0 (208)</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-3 mt-3 pt-3 border-t border-slate-800 text-xs font-mono">
+            <div>
+              <span class="text-slate-500 block text-[10px]">PAYLOAD / VALUE</span>
+              <span class="text-white font-semibold" id="hud-val1">85.0 km/h | 620 RPM</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">CRYPTO / AEAD</span>
+              <span class="text-emerald-400 font-semibold" id="hud-crypto">Ascon-128 Tag OK</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">IDS VERIFICATION</span>
+              <span class="text-cyan-400 font-semibold" id="hud-ids">Tier 2 Score: 0.128 (< τ)</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">ROUTING ACTION</span>
+              <span class="text-purple-400 font-semibold" id="hud-action">Re-encrypt (K1 -> K4)</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- RIGHT: ATTACK INJECTION LAB & LIVE SYSTEM OSCILLOSCOPE (4 Cols) -->
+    <div class="col-span-12 xl:col-span-4 flex flex-col space-y-4">
+
+      <!-- ATTACK INJECTION CONSOLE -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center space-x-2">
+            <span class="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
+            <h2 class="font-bold text-sm text-white tracking-wide">ADVERSARIAL ATTACK INJECTION</h2>
+          </div>
+          <span class="text-[11px] font-mono text-slate-400">OBD-II / Telematics Vector</span>
+        </div>
+
+        <p class="text-xs text-slate-400 mt-2">Trigger real automotive cyber attacks into the isolated CAN bus network to watch Mode B Quarantine and 3-Tier IDS defense in real time:</p>
+
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <button onclick="injectAttack('AT-17')" class="p-2.5 rounded-xl bg-slate-800/80 hover:bg-red-950/60 border border-slate-700 hover:border-red-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white group-hover:text-red-400">AT-17 Speedometer</span>
+              <span class="text-[10px] font-mono text-slate-400">0x0D0</span>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">Masquerade: Highway speed while stationary</p>
+          </button>
+
+          <button onclick="injectAttack('AT-18')" class="p-2.5 rounded-xl bg-slate-800/80 hover:bg-red-950/60 border border-slate-700 hover:border-red-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white group-hover:text-red-400">AT-18 Wheel LOO</span>
+              <span class="text-[10px] font-mono text-slate-400">0x6E0</span>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">Single-wheel differential desynchronization</p>
+          </button>
+
+          <button onclick="injectAttack('AT-19')" class="p-2.5 rounded-xl bg-slate-800/80 hover:bg-red-950/60 border border-slate-700 hover:border-red-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white group-hover:text-red-400">AT-19 Coolant Spike</span>
+              <span class="text-[10px] font-mono text-slate-400">0x4E7</span>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">Thermal inertia violation (> 50°C jump)</p>
+          </button>
+
+          <button onclick="injectAttack('AT-14')" class="p-2.5 rounded-xl bg-slate-800/80 hover:bg-red-950/60 border border-slate-700 hover:border-red-500/50 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white group-hover:text-red-400">AT-14 Wheel Stall</span>
+              <span class="text-[10px] font-mono text-slate-400">0x6E0</span>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">All wheels 0 km/h at highway speed</p>
+          </button>
+        </div>
+
+        <!-- 60/4 PQC Block Drop Test -->
+        <button onclick="injectAttack('PQC-DROP')" class="w-full mt-2.5 p-2 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-700/50 text-xs text-indigo-300 flex items-center justify-between transition">
+          <span class="font-bold flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            Trigger 60/4 PQC Frame Drop & 64-bit NACK Retransmit
+          </span>
+          <span class="text-[10px] font-mono bg-indigo-900/80 px-2 py-0.5 rounded text-indigo-200">Kyber-512</span>
+        </button>
+
+        <!-- Clear Attack Button -->
+        <button onclick="clearAttack()" class="w-full mt-2 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+          Restore Nominal Clean Bus (Stop Attacks)
+        </button>
+      </div>
+
+      <!-- LIVE OSCILLOSCOPE: TIER 2 ANOMALY SCORE & BUFFER SMEARING CHART -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col backdrop-blur-md min-h-[220px]">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+          <div>
+            <h3 class="font-bold text-xs text-white">TIER 2 RECONSTRUCTION OSCILLOSCOPE</h3>
+            <p class="text-[10px] text-slate-400">Mode A (FIFO Smearing) vs Mode B (Quarantine ZOH Recovery)</p>
+          </div>
+          <div class="flex items-center space-x-2 text-[10px] font-mono">
+            <span class="text-amber-400 flex items-center gap-1"><span class="w-2 h-0.5 bg-amber-400 inline-block"></span> Mode A</span>
+            <span class="text-emerald-400 flex items-center gap-1"><span class="w-2 h-0.5 bg-emerald-400 inline-block"></span> Mode B</span>
+            <span class="text-rose-400 flex items-center gap-1"><span class="w-2 h-0.5 bg-rose-400 inline-block"></span> Threshold τ</span>
+          </div>
+        </div>
+
+        <div class="flex-1 relative mt-2">
+          <canvas id="scope-canvas" class="w-full h-full rounded bg-slate-950/80 border border-slate-800"></canvas>
+        </div>
+
+        <div class="flex justify-between items-center text-[10px] font-mono text-slate-400 mt-2 px-1">
+          <span>Target CAN ID: <span class="text-cyan-400 font-bold" id="scope-can-id">0x0D0</span></span>
+          <span>Threshold τ: <span class="text-rose-400 font-bold" id="scope-tau">3.704</span></span>
+          <span>Smeared Frames: <span class="text-emerald-400 font-bold" id="scope-smear">0 (Mode B Active)</span></span>
+        </div>
+      </div>
+
+      <!-- STREAMING CAN-FD PACKET SNIFFER (WIRE ARRIVALS) -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md max-h-[240px] flex flex-col">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+          <span class="font-bold text-xs text-white flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span> Live SocketCAN Wire Tap
+          </span>
+          <span class="text-[10px] font-mono text-slate-400">ISO 11898-1:2015</span>
+        </div>
+        <div id="packet-sniffer-log" class="flex-1 font-mono text-[10.5px] overflow-y-auto space-y-1.5 mt-2 pr-1 select-text">
+          <!-- Live packet entries will populate here -->
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- EMBEDDED JAVASCRIPT LOGIC & WIRE SIMULATOR -->
+  <script>
+    // ------------------------------------------------------------------
+    // Simulation State & Architectural Models
+    // ------------------------------------------------------------------
+    const state = {
+      running: true,
+      speed: 1.0,
+      elapsedMs: 0,
+      frameIdx: 0,
+      activeAttack: null,
+      attackFramesLeft: 0,
+      quarantineMode: 'B', // Mode B (Stateful ZOH)
+      postAttackFrames: 0,
+      
+      // Physical Kinematics
+      speed_kmh: 84.5,
+      rpm: 615.0,
+      steering: 32768,
+      brake_bar: 128.0,
+      wheels: [84.2, 84.1, 84.0, 84.0], // FL, FR, RL, RR
+      coolant_c: 88.5,
+      
+      // Moving wire packets
+      packets: [],
+      
+      // Oscilloscope history
+      scopeHistoryA: [],
+      scopeHistoryB: [],
+      threshold: 3.7043,
+      currentCanId: 208
+    };
+
+    // Tooltip content dictionary
+    const componentDetails = {
+      'wheel-fl': {
+        domain: 'DOMAIN 2: CHASSIS / DYNAMICS',
+        title: 'Front-Left Active Hall-Effect Wheel Speed Sensor',
+        desc: 'Measures angular velocity of the front-left wheel hub. Emits 0x6E0 signal 1.',
+        canId: '0x6E0 (1760)',
+        val1: '84.2 km/h (Nominal)',
+        crypto: 'Ascon-128 Nonce: 0x20',
+        ids: 'LOO Differential: 0.15 km/h (< 5.08 τ)',
+        action: 'Relayed to Powertrain & Stability'
+      },
+      'wheel-fr': {
+        domain: 'DOMAIN 2: CHASSIS / DYNAMICS',
+        title: 'Front-Right Active Hall-Effect Wheel Speed Sensor',
+        desc: 'Measures angular velocity of the front-right wheel hub. Emits 0x6E0 signal 2.',
+        canId: '0x6E0 (1760)',
+        val1: '84.1 km/h (Nominal)',
+        crypto: 'Ascon-128 Nonce: 0x20',
+        ids: 'LOO Differential: 0.05 km/h (< 5.08 τ)',
+        action: 'Relayed to Powertrain & Stability'
+      },
+      'wheel-rl': {
+        domain: 'DOMAIN 2: CHASSIS / DYNAMICS',
+        title: 'Rear-Left Active Hall-Effect Wheel Speed Sensor',
+        desc: 'Measures angular velocity of the rear-left wheel hub. Emits 0x6E0 signal 3.',
+        canId: '0x6E0 (1760)',
+        val1: '84.0 km/h (Nominal)',
+        crypto: 'Ascon-128 Nonce: 0x20',
+        ids: 'LOO Differential: 0.05 km/h (< 5.08 τ)',
+        action: 'Relayed to Powertrain & Stability'
+      },
+      'wheel-rr': {
+        domain: 'DOMAIN 2: CHASSIS / DYNAMICS',
+        title: 'Rear-Right Active Hall-Effect Wheel Speed Sensor',
+        desc: 'Measures angular velocity of the rear-right wheel hub. Emits 0x6E0 signal 4.',
+        canId: '0x6E0 (1760)',
+        val1: '84.0 km/h (Nominal)',
+        crypto: 'Ascon-128 Nonce: 0x20',
+        ids: 'LOO Differential: 0.05 km/h (< 5.08 τ)',
+        action: 'Relayed to Powertrain & Stability'
+      },
+      'component-engine': {
+        domain: 'DOMAIN 1: POWERTRAIN & PROPULSION',
+        title: 'Internal Combustion / Electric Powertrain ECU',
+        desc: 'Transmits primary road speed and crankshaft rotational speed at 100 Hz broadcast rate.',
+        canId: '0x0D0 (208)',
+        val1: 'Speed: 84.5 km/h | 615 RPM',
+        crypto: 'Ascon-128 AEAD Encrypted',
+        ids: 'Cross-Sensor Ratio: 0.137 (< 3.70 τ)',
+        action: 'Default-Deny Forward to Domain 4'
+      },
+      'component-coolant': {
+        domain: 'DOMAIN 3: BODY & THERMAL MANAGEMENT',
+        title: 'Engine Coolant Thermistor Sensor',
+        desc: 'Monitors radiator thermal dissipation. Governed by high physical thermal inertia.',
+        canId: '0x4E7 (1255)',
+        val1: 'Coolant: 88.5 °C',
+        crypto: 'Ascon-128 Tag Verified',
+        ids: 'Thermal Derivative: 0.02 °C/s (< 2.73 τ)',
+        action: 'Forward to Instrument Cluster'
+      },
+      'component-steering': {
+        domain: 'DOMAIN 2: CHASSIS / DYNAMICS',
+        title: 'Steering Column Angle Transducer',
+        desc: 'Measures steering wheel rotational position. Nominal center is 32,768 (0.0°).',
+        canId: '0x354 (852)',
+        val1: 'Angle: 32,768 (Center 0.0°)',
+        crypto: 'Ascon-128 AEAD Encrypted',
+        ids: 'Dynamic Consistency Check PASS',
+        action: 'Chassis Stability Control'
+      },
+      'component-brake': {
+        domain: 'DOMAIN 2: CHASSIS / DYNAMICS',
+        title: 'Hydraulic Brake Pressure Sensor',
+        desc: 'Detects driver braking pressure. Governed by Tier 1.5 Throttle-Brake conflict rules.',
+        canId: '0x354 (852)',
+        val1: 'Pressure: 128 bar',
+        crypto: 'Ascon-128 Tag Verified',
+        ids: 'Deceleration Correlation PASS',
+        action: 'ABS / ESC Hydraulic Actuator'
+      },
+      'component-ivi': {
+        domain: 'DOMAIN 4: INFOTAINMENT & TELEMATICS',
+        title: 'In-Vehicle Infotainment (IVI) & Cockpit Head Unit',
+        desc: 'Receives filtered, verified telemetry for dashboard instrumentation displays.',
+        canId: '0x700+ Routed',
+        val1: 'Driver Cluster Active',
+        crypto: 'Decrypted with Destination Key K4',
+        ids: 'Domain 4 Ingress Gate PASS',
+        action: 'Display On Screen'
+      },
+      'component-attacker': {
+        domain: 'DOMAIN 4: ADVERSARIAL PENETRATION POINT',
+        title: 'Compromised OBD-II / Telematics Interface',
+        desc: 'Simulated adversary attempting masquerade, single-wheel desync, and block drop attacks.',
+        canId: 'INJECTION VECTOR',
+        val1: 'Capability: NET_RAW (Sandboxed)',
+        crypto: 'Tag Forgery & Bit Flips',
+        ids: 'Targeted by 3-Tier IDS',
+        action: 'Dropped by Default-Deny Matrix'
+      },
+      'cisg-gateway': {
+        domain: 'CENTRAL INTELLIGENT SECURITY GATEWAY (CISG)',
+        title: 'C++17 High-Speed Multi-Domain Gateway & IDS',
+        desc: 'Bridges 4 isolated domains via Linux vxcan sockets. Executes 60/4 block reassembly, Ascon-128 AEAD (< 1.23 µs), Tier 1.5 invariants, and Mode B ZOH buffer quarantine.',
+        canId: 'ALL DOMAINS (D1-D4)',
+        val1: 'Throughput: Line-Rate 2.0 Mbps',
+        crypto: 'Dual-Session Key Translation (Ki -> Kj)',
+        ids: 'Mode B Quarantine Active (0 Smeared Frames)',
+        action: 'Enforce Default-Deny Matrix'
+      }
+    };
+
+    function showTooltip(id) {
+      const data = componentDetails[id];
+      if (!data) return;
+      const card = document.getElementById('hover-card');
+      document.getElementById('hud-domain').innerText = data.domain;
+      document.getElementById('hud-title').innerText = data.title;
+      document.getElementById('hud-desc').innerText = data.desc;
+      document.getElementById('hud-can-id').innerText = data.canId;
+      document.getElementById('hud-val1').innerText = data.val1;
+      document.getElementById('hud-crypto').innerText = data.crypto;
+      document.getElementById('hud-ids').innerText = data.ids;
+      document.getElementById('hud-action').innerText = data.action;
+
+      card.classList.remove('opacity-0', 'translate-y-2');
+      card.classList.add('opacity-100', 'translate-y-0');
+    }
+
+    function hideTooltip() {
+      const card = document.getElementById('hover-card');
+      card.classList.add('opacity-0', 'translate-y-2');
+      card.classList.remove('opacity-100', 'translate-y-0');
+    }
+
+    // ------------------------------------------------------------------
+    // Time Controls & Chronograph ("The Watch")
+    // ------------------------------------------------------------------
+    function setSpeed(multiplier) {
+      state.speed = multiplier;
+      document.getElementById('time-slider').value = multiplier;
+      document.getElementById('speed-slider-label').innerText = multiplier.toFixed(2) + 'x ' + (multiplier < 0.3 ? '(Slow-Mo)' : '(Real-Time)');
+      document.getElementById('watch-speed-badge').innerText = multiplier.toFixed(2) + 'x';
+    }
+
+    function onSliderChange(val) {
+      setSpeed(parseFloat(val));
+    }
+
+    function togglePlayPause() {
+      state.running = !state.running;
+      document.getElementById('icon-play').classList.toggle('hidden', state.running);
+      document.getElementById('icon-pause').classList.toggle('hidden', !state.running);
+    }
+
+    function stepSingleFrame() {
+      state.running = false;
+      document.getElementById('icon-play').classList.remove('hidden');
+      document.getElementById('icon-pause').classList.add('hidden');
+      simulateTick(10); // 10 ms CAN step
+    }
+
+    function resetSimulation() {
+      state.elapsedMs = 0;
+      state.frameIdx = 0;
+      state.activeAttack = null;
+      state.attackFramesLeft = 0;
+      state.postAttackFrames = 0;
+      state.packets = [];
+      state.scopeHistoryA = [];
+      state.scopeHistoryB = [];
+      clearAttack();
+      updateClockDisplay();
+    }
+
+    function updateClockDisplay() {
+      const totalSec = Math.floor(state.elapsedMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      const ms = Math.floor(state.elapsedMs % 1000);
+      document.getElementById('sim-clock').innerText = 
+        String(mins).padStart(2, '0') + ':' + 
+        String(secs).padStart(2, '0') + '.' + 
+        String(ms).padStart(3, '0');
+      document.getElementById('sim-frame-counter').innerText = 'FRAME: ' + String(state.frameIdx).padStart(5, '0');
+    }
+
+    // ------------------------------------------------------------------
+    // Attack Injection
+    // ------------------------------------------------------------------
+    function injectAttack(type) {
+      state.activeAttack = type;
+      state.attackFramesLeft = 50; // Injected for 50 frames
+      state.postAttackFrames = 0;
+      
+      const label = document.getElementById('attacker-mode-label');
+      label.innerText = type + ' ACTIVE';
+      label.classList.add('text-rose-400', 'animate-pulse');
+
+      logPacket('ATTACK_INJECT', 0x700, 64, 'ATTACK ACTIVE: ' + type + ' INJECTED AT TELEMATICS OBD-II TAP', 'ALERT');
+    }
+
+    function clearAttack() {
+      state.activeAttack = null;
+      state.attackFramesLeft = 0;
+      state.postAttackFrames = 1;
+      const label = document.getElementById('attacker-mode-label');
+      label.innerText = 'STANDBY';
+      label.classList.remove('text-rose-400', 'animate-pulse');
+      label.classList.add('text-slate-400');
+    }
+
+    // ------------------------------------------------------------------
+    // Simulation Engine Tick
+    // ------------------------------------------------------------------
+    let lastAnimTime = performance.now();
+
+    function animationLoop(now) {
+      const deltaRealMs = now - lastAnimTime;
+      lastAnimTime = now;
+
+      if (state.running) {
+        const simDeltaMs = deltaRealMs * state.speed;
+        simulateTick(simDeltaMs);
+      }
+
+      renderPackets();
+      renderOscilloscope();
+      requestAnimationFrame(animationLoop);
+    }
+
+    let frameAccumulator = 0;
+
+    function simulateTick(deltaMs) {
+      state.elapsedMs += deltaMs;
+      frameAccumulator += deltaMs;
+
+      // 100 Hz CAN broadcast rate = 10 ms per frame period
+      while (frameAccumulator >= 10) {
+        frameAccumulator -= 10;
+        state.frameIdx++;
+
+        if (state.attackFramesLeft > 0) {
+          state.attackFramesLeft--;
+          if (state.attackFramesLeft === 0) {
+            clearAttack();
+          }
+        } else if (state.postAttackFrames > 0) {
+          state.postAttackFrames++;
+        }
+
+        generateCanTraffic();
+      }
+
+      updateClockDisplay();
+    }
+
+    // ------------------------------------------------------------------
+    // Traffic Generation & Wire Pulses
+    // ------------------------------------------------------------------
+    function generateCanTraffic() {
+      // 1. Domain 1: Powertrain 0x0D0 (Engine -> Gateway)
+      let spd = state.speed_kmh;
+      let rpm = state.rpm;
+      let isAttackD1 = (state.activeAttack === 'AT-17');
+
+      if (isAttackD1) {
+        spd = 185.0; // Injected highway speed while rpm is idling!
+      }
+
+      spawnPacket('d1', 260, 260, 420, 260, isAttackD1 ? '#ef4444' : '#f97316', '0x0D0');
+
+      // 2. Domain 2: Chassis 0x6E0 (Wheels -> Gateway)
+      let isAttackD2 = (state.activeAttack === 'AT-18' || state.activeAttack === 'AT-14');
+      spawnPacket('d2-fl', 275, 97, 420, 245, isAttackD2 ? '#ef4444' : '#38bdf8', '0x6E0');
+      spawnPacket('d2-fr', 275, 423, 420, 275, isAttackD2 ? '#ef4444' : '#38bdf8', '0x6E0');
+
+      // 3. Domain 3: Coolant 0x4E7 (Radiator -> Gateway)
+      let isAttackD3 = (state.activeAttack === 'AT-19');
+      let coolant = isAttackD3 ? 142.0 : state.coolant_c;
+      spawnPacket('d3', 157, 260, 420, 260, isAttackD3 ? '#ef4444' : '#10b981', '0x4E7');
+
+      // 4. Domain 4: IVI & Attacker
+      if (state.activeAttack) {
+        spawnPacket('d4-atk', 580, 320, 480, 260, '#ef4444', 'ATTACK');
+      } else {
+        spawnPacket('d4', 480, 260, 520, 260, '#a855f7', '0x700');
+      }
+
+      // Compute Anomaly Scores for Oscilloscope
+      evaluateIdsScores(isAttackD1, isAttackD2, isAttackD3);
+    }
+
+    function spawnPacket(id, x1, y1, x2, y2, color, label) {
+      state.packets.push({
+        id: id + '_' + Math.random(),
+        x1, y1, x2, y2,
+        x: x1, y: y1,
+        progress: 0,
+        color,
+        label,
+        speed: 0.035
+      });
+    }
+
+    function renderPackets() {
+      const container = document.getElementById('packet-container');
+      let html = '';
+
+      for (let i = state.packets.length - 1; i >= 0; i--) {
+        const p = state.packets[i];
+        p.progress += p.speed;
+        p.x = p.x1 + (p.x2 - p.x1) * p.progress;
+        p.y = p.y1 + (p.y2 - p.y1) * p.progress;
+
+        if (p.progress >= 1.0) {
+          // Packet arrived at destination (e.g. Gateway)
+          state.packets.splice(i, 1);
+          continue;
+        }
+
+        html += `
+          <g transform="translate(${p.x}, ${p.y})">
+            <circle cx="0" cy="0" r="5" fill="${p.color}" filter="url(#glow-cyan)"/>
+            <text x="0" y="-8" fill="${p.color}" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">${p.label}</text>
+          </g>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ------------------------------------------------------------------
+    // Oscilloscope & IDS Evaluation Logic (Mode A vs Mode B)
+    // ------------------------------------------------------------------
+    function evaluateIdsScores(isAtk1, isAtk2, isAtk3) {
+      const isUnderAttack = isAtk1 || isAtk2 || isAtk3;
+      let scoreNominal = 0.15 + (Math.random() * 0.1);
+      let scoreAtk = 5.82 + (Math.random() * 0.4);
+
+      let scoreModeA, scoreModeB;
+
+      if (isUnderAttack) {
+        scoreModeA = scoreAtk;
+        scoreModeB = scoreAtk; // Caught immediately in candidate window!
+      } else if (state.postAttackFrames > 0 && state.postAttackFrames <= 29) {
+        // MODE A: Trailing 29-frame smearing in unquarantined FIFO!
+        scoreModeA = 4.2 - (state.postAttackFrames * 0.06); 
+        // MODE B: Instant Zero-Order Hold recovery (0 smeared frames)!
+        scoreModeB = scoreNominal;
+      } else {
+        scoreModeA = scoreNominal;
+        scoreModeB = scoreNominal;
+      }
+
+      state.scopeHistoryA.push(scoreModeA);
+      state.scopeHistoryB.push(scoreModeB);
+
+      if (state.scopeHistoryA.length > 70) {
+        state.scopeHistoryA.shift();
+        state.scopeHistoryB.shift();
+      }
+
+      // Log to CAN Packet Sniffer
+      if (state.frameIdx % 8 === 0) {
+        const verdict = isUnderAttack ? 'QUARANTINE_ZOH' : 'VERIFIED_PASS';
+        const status = isUnderAttack ? 'ALERT' : 'PASS';
+        logPacket('domain1', 0x0D0, 64, `spd=${state.speed_kmh.toFixed(1)} rpm=${state.rpm.toFixed(0)} tag=9F2C verdict=${verdict}`, status);
+      }
+    }
+
+    function renderOscilloscope() {
+      const canvas = document.getElementById('scope-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width = canvas.clientWidth;
+      const h = canvas.height = canvas.clientHeight;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Draw Grid
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      for (let y = 20; y < h; y += 30) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Draw Threshold Line (tau = 3.704)
+      const maxScore = 7.0;
+      const tauY = h - (state.threshold / maxScore) * h;
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, tauY);
+      ctx.lineTo(w, tauY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const ptsA = state.scopeHistoryA;
+      const ptsB = state.scopeHistoryB;
+      const n = ptsA.length;
+      if (n < 2) return;
+
+      const stepX = w / (70 - 1);
+
+      // Draw Mode A curve (Amber / Smeared)
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const x = i * stepX;
+        const y = h - (ptsA[i] / maxScore) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Draw Mode B curve (Emerald / Clean ZOH)
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const x = i * stepX;
+        const y = h - (ptsB[i] / maxScore) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function logPacket(iface, id, dlc, payload, status) {
+      const log = document.getElementById('packet-sniffer-log');
+      const row = document.createElement('div');
+      const isAlert = (status === 'ALERT');
+      row.className = isAlert 
+        ? 'p-1 rounded bg-rose-950/40 text-rose-300 border-l-2 border-rose-500 text-[10px] flex items-center justify-between'
+        : 'p-1 rounded bg-slate-900/60 text-slate-300 border-l-2 border-cyan-500 text-[10px] flex items-center justify-between';
+      
+      const ts = (state.elapsedMs / 1000).toFixed(3);
+      row.innerHTML = `
+        <span class="text-slate-400">[${ts}s] <b class="${isAlert ? 'text-rose-400' : 'text-cyan-400'}">${iface}</b> 0x${id.toString(16).toUpperCase()}</span>
+        <span class="truncate max-w-[160px] text-slate-400">${payload}</span>
+        <span class="px-1.5 py-0.2 rounded font-bold ${isAlert ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}">${status}</span>
+      `;
+      log.prepend(row);
+
+      // Keep max 25 rows
+      while (log.children.length > 25) {
+        log.removeChild(log.lastChild);
+      }
+    }
+
+    // Start Simulation Loop
+    requestAnimationFrame(animationLoop);
+  </script>
+</body>
+</html>

@@ -161,5 +161,30 @@ class DataContractValidator:
         return is_valid, errors
 
 if __name__ == '__main__':
+    import argparse
+    from pathlib import Path
+    parser = argparse.ArgumentParser(description="PQC-CAN-IDS Phase 3 Data Contract Validator")
+    parser.add_argument("--dir", help="Directory containing CSV files to validate")
+    parser.add_argument("--file", help="Specific CSV file to validate")
+    args = parser.parse_args()
+
     validator = DataContractValidator()
     print("Validator initialized with contracts:", validator.get_contract_names())
+
+    if args.file:
+        c_name = Path(args.file).stem
+        if c_name in validator.get_contract_names():
+            valid, errs = validator.validate_csv(c_name, args.file)
+            if valid:
+                print(f"[PASS] {args.file} conforms 100% to contract '{c_name}' (0 errors).")
+            else:
+                print(f"[FAIL] {args.file} failed validation with {len(errs)} errors:\n" + "\n".join(errs[:10]))
+        else:
+            print(f"[WARN] Unknown contract for file {args.file}")
+    elif args.dir:
+        for f in sorted(Path(args.dir).glob("*.csv")):
+            c_name = f.stem
+            if c_name in validator.get_contract_names():
+                valid, errs = validator.validate_csv(c_name, str(f))
+                status = "PASS" if valid else f"FAIL ({len(errs)} errors)"
+                print(f"[{status}] {f.name} -> Contract '{c_name}'")

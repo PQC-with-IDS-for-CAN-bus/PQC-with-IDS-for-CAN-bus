@@ -5,6 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
+cisg_gateway
+Phase 3/DockerLab/cisg_gateway
 
 # Distribution / packaging
 .Python

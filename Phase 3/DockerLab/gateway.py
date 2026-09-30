@@ -10,8 +10,8 @@ from telemetry import IDS, WIRE
 
 
 class Domain:
-    def __init__(self, domain, identity):
-        self.domain, self.identity = domain, identity
+    def __init__(self, domain, identity, gateway=None):
+        self.domain, self.identity, self.gateway = domain, identity, gateway
         self.log = Log(f'gateway-d{domain}')
         wait_interface(f'domain{domain}')
         self.can = CAN(f'domain{domain}', self.log, domain)
@@ -58,7 +58,7 @@ class Domain:
         if self.rate_count > 100:
             self.log.event('rate_limit_rejected', domain=self.domain)
             return
-        if can_id != DIAGNOSTIC:
+        if can_id != DIAGNOSTIC and can_id not in TELEMETRY_CAN_IDS:
             self.log.event('unexpected_id_rejected', domain=self.domain, can_id=f'0x{can_id:03x}')
             return
         if not self.key:
@@ -68,7 +68,7 @@ class Domain:
             self.log.event('header_rejected', domain=self.domain)
             return
         kind, ecu, domain, flags, counter = DIAG_HEADER.unpack(payload[:8])
-        if kind not in (0x1f, 0x1e) or (ecu, domain, flags) != (self.identity['ecu_id'], self.domain, 0x40):
+        if kind not in (0x11, 0x1f, 0x1e) or (ecu, domain, flags) != (self.identity['ecu_id'], self.domain, 0x40):
             self.log.event('header_rejected', domain=self.domain)
             return
         if counter <= self.counter:
@@ -83,14 +83,28 @@ class Domain:
         # Commit counter only after authentication; forged high counters cannot poison it.
         self.counter = counter
         self.runtime_seen += 1
-        if kind == 0x1e:
+        if kind in (0x11, 0x1e):
             values = WIRE.unpack(plaintext)
             try:
-                decision = self.ids.evaluate(values[:9], values[9])
+                decision = self.ids.evaluate(values[:9], values[9] if len(values) > 9 else can_id)
             except ValueError as exc:
                 self.log.event('telemetry_rejected', domain=self.domain, error=str(exc))
                 return
             self.log.event('telemetry_evaluated', domain=self.domain, counter=counter, **decision)
+
+            # Step 12 & 13: Inter-Domain Default-Deny Routing & Re-encryption
+            if decision.get('tier15') == 'PASS' and decision.get('tier2') != 'ANOMALY_DETECTED' and getattr(self, 'gateway', None):
+                for target_domain_idx in range(1, 5):
+                    if target_domain_idx != self.domain and evaluate_routing_policy(self.domain, target_domain_idx, can_id):
+                        target_domain = self.gateway.domains.get(str(target_domain_idx))
+                        if target_domain and target_domain.key:
+                            target_domain.counter += 1
+                            target_ecu = target_domain.identity['ecu_id']
+                            target_header = CAT1_HEADER.pack(0x11, self.identity['ecu_id'], self.domain, 0x40, target_domain.counter)
+                            target_nonce = SessionManager.derive_runtime_nonce(target_ecu, target_domain_idx, target_domain.counter, direction=1)
+                            ct, atag = AsconAEAD128Engine.encrypt(target_domain.key, target_nonce, plaintext, target_header)
+                            target_domain.can.send(can_id, target_header + ct + atag, routed_from=self.domain)
+                            self.log.event('interdomain_routed', src_domain=self.domain, dst_domain=target_domain_idx, can_id=f'0x{can_id:03x}')
         else:
             self.log.event('diagnostic_accepted', domain=self.domain, counter=counter,
                            source_sha256=plaintext[:32].hex(), ecu_monotonic_ns=int.from_bytes(plaintext[32:], 'big'),
@@ -200,7 +214,7 @@ class Domain:
 class Gateway:
     def __init__(self):
         identities = json.loads(Path('/credentials/identity.json').read_text())
-        self.domains = {str(d):Domain(d, identities[str(d)]) for d in range(1,5)}
+        self.domains = {str(d):Domain(d, identities[str(d)], gateway=self) for d in range(1,5)}
     def status(self):
         return dict(ready=True, domains={d:dict(busy=s.busy, result=s.result, run_id=s.log.run_id) for d,s in self.domains.items()})
     def command(self, path, config):

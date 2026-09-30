@@ -17,10 +17,52 @@ from canfd_schema import ChallengeFrame, AttestationDeliveryManager, IndexedAtte
 CANFD = struct.Struct('=IBB2x64s')
 NACK = struct.Struct('>BBBBIQ')
 CHALLENGE, ATTESTATION, RECOVERY, KEY, DIAGNOSTIC = 0x202, 0x200, 0x201, 0x203, 0x300
-# Lab diagnostic schema (not vehicle telemetry): 40 actual SHA256/clock bytes,
-# authenticated 8B header. Protocol version 1, private diagnostic type 0xF.
+
+# Canonical Category 1 Telemetry Arbitration IDs per ISO 11898-1 / v1.6 Schematics
+CAN_ID_POWERTRAIN = 0x0D0  # 208: Speed, RPM
+CAN_ID_CHASSIS    = 0x354  # 852: Steering, Brake
+CAN_ID_THERMAL    = 0x4E7  # 1255: Engine Coolant Temp
+CAN_ID_WHEELS     = 0x6E0  # 1760: 4 Wheels (FL, FR, RL, RR)
+TELEMETRY_CAN_IDS = {CAN_ID_POWERTRAIN, CAN_ID_CHASSIS, CAN_ID_THERMAL, CAN_ID_WHEELS}
+
+# Category 1 / Diagnostic Header (8 Bytes Associated Data)
+# Byte 0: PROTOCOL_VER_TYPE (0x11 for Cat 1 Telemetry, 0x1E/0x1F for diagnostic)
+# Byte 1: SENDER_ECU_ID
+# Byte 2: DOMAIN_ID (1=Powertrain, 2=Chassis, 3=Body, 4=Infotainment)
+# Byte 3: FLAGS_RESERVED (0x40 = Encrypted)
+# Bytes 4-7: MONOTONIC_COUNTER (32-bit BE)
 DIAG_HEADER = struct.Struct('>BBBBI')
+CAT1_HEADER = DIAG_HEADER
+
 DOMAIN_NAMES = ['powertrain', 'chassis', 'body', 'infotainment']
+
+# Default-Deny Routing Policy Classes
+POLICY_CLASSES = {
+    1: 'SAFETY',        # Powertrain
+    2: 'SAFETY',        # Chassis
+    3: 'COMFORT',       # Body & Comfort
+    4: 'INFOTAINMENT',  # Infotainment / Telematics
+}
+
+def evaluate_routing_policy(src_domain: int, dst_domain: int, can_id: int = 0) -> bool:
+    """Enforces the Default-Deny Inter-Domain Routing Matrix (Blueprint v4 Section 2)."""
+    if src_domain == dst_domain:
+        return False  # Intra-domain traffic is not routed across interfaces
+    src_class = POLICY_CLASSES.get(src_domain, 'BLOCKED')
+    dst_class = POLICY_CLASSES.get(dst_domain, 'BLOCKED')
+
+    if src_class == 'SAFETY' and dst_class == 'INFOTAINMENT':
+        return True  # Read-only telemetry permitted
+    if src_class == 'SAFETY' and dst_class == 'COMFORT':
+        return False # Blocked
+    if src_class == 'COMFORT' and dst_class == 'SAFETY':
+        return False # Blocked
+    if src_class == 'INFOTAINMENT' and dst_class == 'COMFORT':
+        return can_id in {0x300, CAN_ID_THERMAL}  # Whitelisted only
+    if src_class == 'INFOTAINMENT' and dst_class == 'SAFETY':
+        return False # STRICTLY BLOCKED (highest priority air-gap rule)
+    return False
+
 
 
 def atomic(path, value):
