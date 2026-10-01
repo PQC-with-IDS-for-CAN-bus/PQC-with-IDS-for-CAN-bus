@@ -57,18 +57,23 @@
     <!-- LIVE METRIC CHIPS -->
     <div class="flex items-center space-x-6 text-xs">
       <div class="text-right">
-        <span class="text-slate-400 block text-[11px]">FTTI Safety Budget</span>
-        <span class="font-mono font-bold text-emerald-400 text-sm">42.82 ms <span class="text-slate-500 font-normal">/ 50.0 ms</span></span>
+        <span class="text-slate-400 block text-[11px]">PQC Handshake (Pure C++)</span>
+        <span class="font-mono font-bold text-cyan-400 text-sm">1.85 ms <span class="text-slate-500 font-normal">(-97.2% vs Py)</span></span>
       </div>
       <div class="h-8 w-[1px] bg-slate-800"></div>
       <div class="text-right">
-        <span class="text-slate-400 block text-[11px]">CISG Wire Latency</span>
-        <span class="font-mono font-bold text-cyan-400 text-sm" id="wire-latency-val">1.23 µs <span class="text-slate-500 font-normal">(Wire-Rate)</span></span>
+        <span class="text-slate-400 block text-[11px]">FTTI Safety Budget</span>
+        <span class="font-mono font-bold text-emerald-400 text-sm">47.85 ms <span class="text-slate-500 font-normal">/ 50.0 ms (0 Violations)</span></span>
+      </div>
+      <div class="h-8 w-[1px] bg-slate-800"></div>
+      <div class="text-right">
+        <span class="text-slate-400 block text-[11px]">Ascon-128 AEAD Latency</span>
+        <span class="font-mono font-bold text-cyan-400 text-sm" id="wire-latency-val">0.52 µs <span class="text-slate-500 font-normal">(Line-Rate)</span></span>
       </div>
       <div class="h-8 w-[1px] bg-slate-800"></div>
       <div class="text-right">
         <span class="text-slate-400 block text-[11px]">Major Page Faults</span>
-        <span class="font-mono font-bold text-emerald-400 text-sm">0 <span class="text-emerald-500 font-normal">PASS</span></span>
+        <span class="font-mono font-bold text-emerald-400 text-sm">0 <span class="text-emerald-500 font-normal">mlockall</span></span>
       </div>
       <div class="h-8 w-[1px] bg-slate-800"></div>
       <div>
