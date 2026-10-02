@@ -1,0 +1,912 @@
+{
+  "timestamp_utc": "2026-10-02T08:58:55Z",
+  "total_tests": 123,
+  "total_passed": 123,
+  "total_failed": 0,
+  "total_errors": 0,
+  "overall_elapsed_s": 0.38211620002402924,
+  "status": "PASS",
+  "tiers": [
+    {
+      "tier_name": "Tier 1: Feature Coverage (45 tests)",
+      "tests_run": 45,
+      "passed": 45,
+      "failed": 0,
+      "errors": 0,
+      "elapsed_s": 0.32214430000749417,
+      "records": [
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_01_cmake_cxx17_configuration",
+          "name": "test_f1_01_cmake_cxx17_configuration (test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_01_cmake_cxx17_configuration)",
+          "status": "PASS",
+          "elapsed_s": 0.0001399999891873449,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_02_cmake_target_and_dependency_linkage",
+          "name": "test_f1_02_cmake_target_and_dependency_linkage (test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_02_cmake_target_and_dependency_linkage)",
+          "status": "PASS",
+          "elapsed_s": 4.740001168102026e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_03_dockerfile_multi_stage_structure",
+          "name": "test_f1_03_dockerfile_multi_stage_structure (test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_03_dockerfile_multi_stage_structure)",
+          "status": "PASS",
+          "elapsed_s": 2.8000009479001164e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_04_compose_yaml_topology_and_healthcheck",
+          "name": "test_f1_04_compose_yaml_topology_and_healthcheck (test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_04_compose_yaml_topology_and_healthcheck)",
+          "status": "PASS",
+          "elapsed_s": 3.7299992982298136e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_05_socketcan_vxcan_network_topology",
+          "name": "test_f1_05_socketcan_vxcan_network_topology (test_tier1_feature_coverage.TestTier1Feature1ContainerBuildSystem.test_f1_05_socketcan_vxcan_network_topology)",
+          "status": "PASS",
+          "elapsed_s": 3.649998689070344e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_01_mldsa44_nist_fips_204_buffer_dimensions",
+          "name": "test_f2_01_mldsa44_nist_fips_204_buffer_dimensions (test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_01_mldsa44_nist_fips_204_buffer_dimensions)",
+          "status": "PASS",
+          "elapsed_s": 3.409999771974981e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_02_mldsa44_cryptographic_parameter_constants",
+          "name": "test_f2_02_mldsa44_cryptographic_parameter_constants (test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_02_mldsa44_cryptographic_parameter_constants)",
+          "status": "PASS",
+          "elapsed_s": 3.819999983534217e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_03_pao_signature_encapsulation_math",
+          "name": "test_f2_03_pao_signature_encapsulation_math (test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_03_pao_signature_encapsulation_math)",
+          "status": "PASS",
+          "elapsed_s": 2.1199986804276705e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_04_liboqs_cxx_wrapper_interface_contract",
+          "name": "test_f2_04_liboqs_cxx_wrapper_interface_contract (test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_04_liboqs_cxx_wrapper_interface_contract)",
+          "status": "PASS",
+          "elapsed_s": 3.1800009310245514e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_05_dummy_loop_elimination_verification",
+          "name": "test_f2_05_dummy_loop_elimination_verification (test_tier1_feature_coverage.TestTier1Feature2MLDSA44Engine.test_f2_05_dummy_loop_elimination_verification)",
+          "status": "PASS",
+          "elapsed_s": 0.0004670000053010881,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_01_ascon_standard_constants_and_iv",
+          "name": "test_f3_01_ascon_standard_constants_and_iv (test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_01_ascon_standard_constants_and_iv)",
+          "status": "PASS",
+          "elapsed_s": 3.739999374374747e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_02_ascon_little_endian_word_mapping",
+          "name": "test_f3_02_ascon_little_endian_word_mapping (test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_02_ascon_little_endian_word_mapping)",
+          "status": "PASS",
+          "elapsed_s": 3.440000000409782e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_03_ascon_ad_construction_standard",
+          "name": "test_f3_03_ascon_ad_construction_standard (test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_03_ascon_ad_construction_standard)",
+          "status": "PASS",
+          "elapsed_s": 2.7999980375170708e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_04_ascon_in_memory_derived_nonce",
+          "name": "test_f3_04_ascon_in_memory_derived_nonce (test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_04_ascon_in_memory_derived_nonce)",
+          "status": "PASS",
+          "elapsed_s": 2.6900001103058457e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_05_ascon_sp800_232_test_vector_bit_exactness",
+          "name": "test_f3_05_ascon_sp800_232_test_vector_bit_exactness (test_tier1_feature_coverage.TestTier1Feature3AsconAEAD128.test_f3_05_ascon_sp800_232_test_vector_bit_exactness)",
+          "status": "PASS",
+          "elapsed_s": 0.0013421000039670616,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_01_pao_fragmentation_frame_count_math",
+          "name": "test_f4_01_pao_fragmentation_frame_count_math (test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_01_pao_fragmentation_frame_count_math)",
+          "status": "PASS",
+          "elapsed_s": 3.090000245720148e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_02_block_transfer_4byte_header_structure",
+          "name": "test_f4_02_block_transfer_4byte_header_structure (test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_02_block_transfer_4byte_header_structure)",
+          "status": "PASS",
+          "elapsed_s": 2.1599989850074053e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_03_total_canfd_dlc15_wire_frame_payload",
+          "name": "test_f4_03_total_canfd_dlc15_wire_frame_payload (test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_03_total_canfd_dlc15_wire_frame_payload)",
+          "status": "PASS",
+          "elapsed_s": 1.279998105019331e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_04_selective_bitmap_nack_format_can_id_0x201",
+          "name": "test_f4_04_selective_bitmap_nack_format_can_id_0x201 (test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_04_selective_bitmap_nack_format_can_id_0x201)",
+          "status": "PASS",
+          "elapsed_s": 1.759998849593103e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_05_reassembly_engine_bitmap_tracking",
+          "name": "test_f4_05_reassembly_engine_bitmap_tracking (test_tier1_feature_coverage.TestTier1Feature4BlockTransferNACK.test_f4_05_reassembly_engine_bitmap_tracking)",
+          "status": "PASS",
+          "elapsed_s": 1.829999382607639e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_01_onnx_model_metadata_and_tensor_dimensions",
+          "name": "test_f5_01_onnx_model_metadata_and_tensor_dimensions (test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_01_onnx_model_metadata_and_tensor_dimensions)",
+          "status": "PASS",
+          "elapsed_s": 2.509998739697039e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_02_physical_scaler_parameters_validation",
+          "name": "test_f5_02_physical_scaler_parameters_validation (test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_02_physical_scaler_parameters_validation)",
+          "status": "PASS",
+          "elapsed_s": 0.0006831999926362187,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_03_calibrated_anomaly_thresholds_tau",
+          "name": "test_f5_03_calibrated_anomaly_thresholds_tau (test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_03_calibrated_anomaly_thresholds_tau)",
+          "status": "PASS",
+          "elapsed_s": 0.0006648999988101423,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_04_mode_b_zoh_quarantine_substitution",
+          "name": "test_f5_04_mode_b_zoh_quarantine_substitution (test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_04_mode_b_zoh_quarantine_substitution)",
+          "status": "PASS",
+          "elapsed_s": 0.00010159998782910407,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_05_onnx_runtime_execution_on_kinematic_window",
+          "name": "test_f5_05_onnx_runtime_execution_on_kinematic_window (test_tier1_feature_coverage.TestTier1Feature5NativeONNXAndZOH.test_f5_05_onnx_runtime_execution_on_kinematic_window)",
+          "status": "PASS",
+          "elapsed_s": 0.3147506999957841,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_01_canfd_dual_bitrate_timing_constants",
+          "name": "test_f6_01_canfd_dual_bitrate_timing_constants (test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_01_canfd_dual_bitrate_timing_constants)",
+          "status": "PASS",
+          "elapsed_s": 3.279998782090843e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_02_nominal_64byte_frame_wire_duration",
+          "name": "test_f6_02_nominal_64byte_frame_wire_duration (test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_02_nominal_64byte_frame_wire_duration)",
+          "status": "PASS",
+          "elapsed_s": 3.6999990697950125e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_03_worst_case_bit_stuffed_frame_wire_duration",
+          "name": "test_f6_03_worst_case_bit_stuffed_frame_wire_duration (test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_03_worst_case_bit_stuffed_frame_wire_duration)",
+          "status": "PASS",
+          "elapsed_s": 2.099998528137803e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_04_41frame_burst_wire_serialization_floor",
+          "name": "test_f6_04_41frame_burst_wire_serialization_floor (test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_04_41frame_burst_wire_serialization_floor)",
+          "status": "PASS",
+          "elapsed_s": 1.719998545013368e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_05_mlockall_memory_locking_asil_d_specification",
+          "name": "test_f6_05_mlockall_memory_locking_asil_d_specification (test_tier1_feature_coverage.TestTier1Feature6PhysicalWireSerialization.test_f6_05_mlockall_memory_locking_asil_d_specification)",
+          "status": "PASS",
+          "elapsed_s": 1.2500007869675756e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_01_http_port_8080_endpoint_definitions",
+          "name": "test_f7_01_http_port_8080_endpoint_definitions (test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_01_http_port_8080_endpoint_definitions)",
+          "status": "PASS",
+          "elapsed_s": 3.259998629800975e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_02_health_endpoint_response_schema",
+          "name": "test_f7_02_health_endpoint_response_schema (test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_02_health_endpoint_response_schema)",
+          "status": "PASS",
+          "elapsed_s": 1.7099984688684344e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_03_configure_endpoint_request_schema",
+          "name": "test_f7_03_configure_endpoint_request_schema (test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_03_configure_endpoint_request_schema)",
+          "status": "PASS",
+          "elapsed_s": 1.2499978765845299e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_04_prepare_endpoint_request_schema",
+          "name": "test_f7_04_prepare_endpoint_request_schema (test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_04_prepare_endpoint_request_schema)",
+          "status": "PASS",
+          "elapsed_s": 1.4099990949034691e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_05_run_endpoint_request_schema",
+          "name": "test_f7_05_run_endpoint_request_schema (test_tier1_feature_coverage.TestTier1Feature7EmbeddedRESTServer.test_f7_05_run_endpoint_request_schema)",
+          "status": "PASS",
+          "elapsed_s": 1.2100004823878407e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_01_perf_stat_summary_schema_columns",
+          "name": "test_f8_01_perf_stat_summary_schema_columns (test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_01_perf_stat_summary_schema_columns)",
+          "status": "PASS",
+          "elapsed_s": 0.000804700015578419,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_02_tcpdump_latency_summary_schema_columns",
+          "name": "test_f8_02_tcpdump_latency_summary_schema_columns (test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_02_tcpdump_latency_summary_schema_columns)",
+          "status": "PASS",
+          "elapsed_s": 0.000538399996003136,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_03_fault_recovery_runs_schema_columns",
+          "name": "test_f8_03_fault_recovery_runs_schema_columns (test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_03_fault_recovery_runs_schema_columns)",
+          "status": "PASS",
+          "elapsed_s": 0.0004898000042885542,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_04_contract_validator_integration",
+          "name": "test_f8_04_contract_validator_integration (test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_04_contract_validator_integration)",
+          "status": "PASS",
+          "elapsed_s": 0.0004975999763701111,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_05_31_scenario_master_workload_matrix",
+          "name": "test_f8_05_31_scenario_master_workload_matrix (test_tier1_feature_coverage.TestTier1Feature8DataContracts.test_f8_05_31_scenario_master_workload_matrix)",
+          "status": "PASS",
+          "elapsed_s": 1.659998088143766e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_01_upstream_repository_links_specification",
+          "name": "test_f9_01_upstream_repository_links_specification (test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_01_upstream_repository_links_specification)",
+          "status": "PASS",
+          "elapsed_s": 2.160001895390451e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_02_fips204_mldsa44_mathematical_citations",
+          "name": "test_f9_02_fips204_mldsa44_mathematical_citations (test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_02_fips204_mldsa44_mathematical_citations)",
+          "status": "PASS",
+          "elapsed_s": 2.0499981474131346e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_03_sp800_232_ascon_mathematical_citations",
+          "name": "test_f9_03_sp800_232_ascon_mathematical_citations (test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_03_sp800_232_ascon_mathematical_citations)",
+          "status": "PASS",
+          "elapsed_s": 1.3100012438371778e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_04_iso11898_1_wire_timing_mathematical_citations",
+          "name": "test_f9_04_iso11898_1_wire_timing_mathematical_citations (test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_04_iso11898_1_wire_timing_mathematical_citations)",
+          "status": "PASS",
+          "elapsed_s": 1.3800017768517137e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_05_mode_b_zoh_quarantine_mathematical_citations",
+          "name": "test_f9_05_mode_b_zoh_quarantine_mathematical_citations (test_tier1_feature_coverage.TestTier1Feature9CodeProvenanceFootnotes.test_f9_05_mode_b_zoh_quarantine_mathematical_citations)",
+          "status": "PASS",
+          "elapsed_s": 1.789999078027904e-05,
+          "error": null
+        }
+      ]
+    },
+    {
+      "tier_name": "Tier 2: Boundary & Corner Cases (45 tests)",
+      "tests_run": 45,
+      "passed": 45,
+      "failed": 0,
+      "errors": 0,
+      "elapsed_s": 0.008408299996517599,
+      "records": [
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b01_compiler_flags_missing_optimization_rejected",
+          "name": "test_f1_b01_compiler_flags_missing_optimization_rejected (test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b01_compiler_flags_missing_optimization_rejected)",
+          "status": "PASS",
+          "elapsed_s": 4.089999129064381e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b02_missing_core_library_linkage_fails",
+          "name": "test_f1_b02_missing_core_library_linkage_fails (test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b02_missing_core_library_linkage_fails)",
+          "status": "PASS",
+          "elapsed_s": 2.269999822601676e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b03_docker_compose_extreme_resource_limits",
+          "name": "test_f1_b03_docker_compose_extreme_resource_limits (test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b03_docker_compose_extreme_resource_limits)",
+          "status": "PASS",
+          "elapsed_s": 1.3999990187585354e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b04_socketcan_interface_naming_boundary",
+          "name": "test_f1_b04_socketcan_interface_naming_boundary (test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b04_socketcan_interface_naming_boundary)",
+          "status": "PASS",
+          "elapsed_s": 0.00012900002184323967,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b05_tmpfs_and_readonly_filesystem_enforcement",
+          "name": "test_f1_b05_tmpfs_and_readonly_filesystem_enforcement (test_tier2_boundary_corner.TestTier2Feature1ContainerBuildBoundaries.test_f1_b05_tmpfs_and_readonly_filesystem_enforcement)",
+          "status": "PASS",
+          "elapsed_s": 1.930000144056976e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b01_mldsa44_corrupted_signature_rejection",
+          "name": "test_f2_b01_mldsa44_corrupted_signature_rejection (test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b01_mldsa44_corrupted_signature_rejection)",
+          "status": "PASS",
+          "elapsed_s": 0.00020330000552348793,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b02_mldsa44_truncated_signature_rejection",
+          "name": "test_f2_b02_mldsa44_truncated_signature_rejection (test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b02_mldsa44_truncated_signature_rejection)",
+          "status": "PASS",
+          "elapsed_s": 3.250001464039087e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b03_mldsa44_oversized_signature_rejection",
+          "name": "test_f2_b03_mldsa44_oversized_signature_rejection (test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b03_mldsa44_oversized_signature_rejection)",
+          "status": "PASS",
+          "elapsed_s": 2.1299987565726042e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b04_mldsa44_corrupted_public_key_rejection",
+          "name": "test_f2_b04_mldsa44_corrupted_public_key_rejection (test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b04_mldsa44_corrupted_public_key_rejection)",
+          "status": "PASS",
+          "elapsed_s": 1.3699987903237343e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b05_mldsa44_empty_message_signing",
+          "name": "test_f2_b05_mldsa44_empty_message_signing (test_tier2_boundary_corner.TestTier2Feature2MLDSA44Boundaries.test_f2_b05_mldsa44_empty_message_signing)",
+          "status": "PASS",
+          "elapsed_s": 1.170000177808106e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b01_ascon_single_bit_flip_in_tag_rejection",
+          "name": "test_f3_b01_ascon_single_bit_flip_in_tag_rejection (test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b01_ascon_single_bit_flip_in_tag_rejection)",
+          "status": "PASS",
+          "elapsed_s": 0.0006189999985508621,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b02_ascon_single_bit_flip_in_ciphertext_rejection",
+          "name": "test_f3_b02_ascon_single_bit_flip_in_ciphertext_rejection (test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b02_ascon_single_bit_flip_in_ciphertext_rejection)",
+          "status": "PASS",
+          "elapsed_s": 0.0005370000144466758,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b03_ascon_single_bit_flip_in_associated_data_rejection",
+          "name": "test_f3_b03_ascon_single_bit_flip_in_associated_data_rejection (test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b03_ascon_single_bit_flip_in_associated_data_rejection)",
+          "status": "PASS",
+          "elapsed_s": 0.000530099991010502,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b04_ascon_counter_rollover_at_0xefffffff",
+          "name": "test_f3_b04_ascon_counter_rollover_at_0xefffffff (test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b04_ascon_counter_rollover_at_0xefffffff)",
+          "status": "PASS",
+          "elapsed_s": 0.000305800000205636,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b05_ascon_zero_length_payload_encryption",
+          "name": "test_f3_b05_ascon_zero_length_payload_encryption (test_tier2_boundary_corner.TestTier2Feature3AsconAEAD128Boundaries.test_f3_b05_ascon_zero_length_payload_encryption)",
+          "status": "PASS",
+          "elapsed_s": 0.0008821999945212156,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b01_out_of_range_frame_index_rejection",
+          "name": "test_f4_b01_out_of_range_frame_index_rejection (test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b01_out_of_range_frame_index_rejection)",
+          "status": "PASS",
+          "elapsed_s": 2.3300002794712782e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b02_total_frames_mismatch_rejection",
+          "name": "test_f4_b02_total_frames_mismatch_rejection (test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b02_total_frames_mismatch_rejection)",
+          "status": "PASS",
+          "elapsed_s": 1.4299992471933365e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b03_duplicate_frame_idempotent_ingestion",
+          "name": "test_f4_b03_duplicate_frame_idempotent_ingestion (test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b03_duplicate_frame_idempotent_ingestion)",
+          "status": "PASS",
+          "elapsed_s": 1.37000170070678e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b04_nack_bitmap_boundary_limits",
+          "name": "test_f4_b04_nack_bitmap_boundary_limits (test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b04_nack_bitmap_boundary_limits)",
+          "status": "PASS",
+          "elapsed_s": 1.2399978004395962e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b05_late_sequence_frame_drop_recovery",
+          "name": "test_f4_b05_late_sequence_frame_drop_recovery (test_tier2_boundary_corner.TestTier2Feature4BlockTransferBoundaries.test_f4_b05_late_sequence_frame_drop_recovery)",
+          "status": "PASS",
+          "elapsed_s": 1.1800002539530396e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b01_sliding_window_buffer_underflow_warmup",
+          "name": "test_f5_b01_sliding_window_buffer_underflow_warmup (test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b01_sliding_window_buffer_underflow_warmup)",
+          "status": "PASS",
+          "elapsed_s": 6.079999729990959e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b02_extreme_sensor_spikes_quarantine",
+          "name": "test_f5_b02_extreme_sensor_spikes_quarantine (test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b02_extreme_sensor_spikes_quarantine)",
+          "status": "PASS",
+          "elapsed_s": 1.4699995517730713e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b03_identical_static_kinematic_frames",
+          "name": "test_f5_b03_identical_static_kinematic_frames (test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b03_identical_static_kinematic_frames)",
+          "status": "PASS",
+          "elapsed_s": 0.0001407999952789396,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b04_mode_b_zoh_persistence_recovery",
+          "name": "test_f5_b04_mode_b_zoh_persistence_recovery (test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b04_mode_b_zoh_persistence_recovery)",
+          "status": "PASS",
+          "elapsed_s": 2.6699999580159783e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b05_zero_floor_loo_differential_boundary",
+          "name": "test_f5_b05_zero_floor_loo_differential_boundary (test_tier2_boundary_corner.TestTier2Feature5NativeONNXAndZOHBoundaries.test_f5_b05_zero_floor_loo_differential_boundary)",
+          "status": "PASS",
+          "elapsed_s": 2.060001133941114e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b01_zero_payload_canfd_frame_timing",
+          "name": "test_f6_b01_zero_payload_canfd_frame_timing (test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b01_zero_payload_canfd_frame_timing)",
+          "status": "PASS",
+          "elapsed_s": 2.3800006601959467e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b02_maximum_64byte_canfd_frame_timing",
+          "name": "test_f6_b02_maximum_64byte_canfd_frame_timing (test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b02_maximum_64byte_canfd_frame_timing)",
+          "status": "PASS",
+          "elapsed_s": 3.160000778734684e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b03_zero_pacing_gap_vs_minimum_interframe_gap",
+          "name": "test_f6_b03_zero_pacing_gap_vs_minimum_interframe_gap (test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b03_zero_pacing_gap_vs_minimum_interframe_gap)",
+          "status": "PASS",
+          "elapsed_s": 1.5100027667358518e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b04_bus_off_recovery_timing_boundary",
+          "name": "test_f6_b04_bus_off_recovery_timing_boundary (test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b04_bus_off_recovery_timing_boundary)",
+          "status": "PASS",
+          "elapsed_s": 1.4899997040629387e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b05_major_page_fault_tolerance_zero",
+          "name": "test_f6_b05_major_page_fault_tolerance_zero (test_tier2_boundary_corner.TestTier2Feature6PhysicalWireTimingBoundaries.test_f6_b05_major_page_fault_tolerance_zero)",
+          "status": "PASS",
+          "elapsed_s": 1.3899989426136017e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b01_malformed_json_request_handling",
+          "name": "test_f7_b01_malformed_json_request_handling (test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b01_malformed_json_request_handling)",
+          "status": "PASS",
+          "elapsed_s": 6.819999543949962e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b02_unsupported_http_method_handling",
+          "name": "test_f7_b02_unsupported_http_method_handling (test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b02_unsupported_http_method_handling)",
+          "status": "PASS",
+          "elapsed_s": 1.550000160932541e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b03_nonexistent_endpoint_404_handling",
+          "name": "test_f7_b03_nonexistent_endpoint_404_handling (test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b03_nonexistent_endpoint_404_handling)",
+          "status": "PASS",
+          "elapsed_s": 1.3200013199821115e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b04_domain_out_of_bounds_handling",
+          "name": "test_f7_b04_domain_out_of_bounds_handling (test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b04_domain_out_of_bounds_handling)",
+          "status": "PASS",
+          "elapsed_s": 1.2400007108226418e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b05_concurrent_busy_state_handling",
+          "name": "test_f7_b05_concurrent_busy_state_handling (test_tier2_boundary_corner.TestTier2Feature7EmbeddedRESTServerBoundaries.test_f7_b05_concurrent_busy_state_handling)",
+          "status": "PASS",
+          "elapsed_s": 1.5600002370774746e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b01_contract1_invalid_task_name_rejected",
+          "name": "test_f8_b01_contract1_invalid_task_name_rejected (test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b01_contract1_invalid_task_name_rejected)",
+          "status": "PASS",
+          "elapsed_s": 0.0007170000171754509,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b02_contract1_nonzero_major_page_fault_rejected",
+          "name": "test_f8_b02_contract1_nonzero_major_page_fault_rejected (test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b02_contract1_nonzero_major_page_fault_rejected)",
+          "status": "PASS",
+          "elapsed_s": 0.0006461000011768192,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b03_contract2_malformed_can_id_hex_rejected",
+          "name": "test_f8_b03_contract2_malformed_can_id_hex_rejected (test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b03_contract2_malformed_can_id_hex_rejected)",
+          "status": "PASS",
+          "elapsed_s": 0.0008702000195626169,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b04_contract3_invalid_iso26262_classification_rejected",
+          "name": "test_f8_b04_contract3_invalid_iso26262_classification_rejected (test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b04_contract3_invalid_iso26262_classification_rejected)",
+          "status": "PASS",
+          "elapsed_s": 0.0006237999768927693,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b05_contract3_empty_csv_file_rejected",
+          "name": "test_f8_b05_contract3_empty_csv_file_rejected (test_tier2_boundary_corner.TestTier2Feature8DataContractsBoundaries.test_f8_b05_contract3_empty_csv_file_rejected)",
+          "status": "PASS",
+          "elapsed_s": 0.000599899998633191,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b01_missing_upstream_url_detection",
+          "name": "test_f9_b01_missing_upstream_url_detection (test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b01_missing_upstream_url_detection)",
+          "status": "PASS",
+          "elapsed_s": 3.57000099029392e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b02_missing_fips204_citation_detection",
+          "name": "test_f9_b02_missing_fips204_citation_detection (test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b02_missing_fips204_citation_detection)",
+          "status": "PASS",
+          "elapsed_s": 1.889999839477241e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b03_missing_sp800_232_citation_detection",
+          "name": "test_f9_b03_missing_sp800_232_citation_detection (test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b03_missing_sp800_232_citation_detection)",
+          "status": "PASS",
+          "elapsed_s": 1.6200006939470768e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b04_missing_iso11898_citation_detection",
+          "name": "test_f9_b04_missing_iso11898_citation_detection (test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b04_missing_iso11898_citation_detection)",
+          "status": "PASS",
+          "elapsed_s": 1.5300000086426735e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b05_unauthorized_git_repo_write_prohibition",
+          "name": "test_f9_b05_unauthorized_git_repo_write_prohibition (test_tier2_boundary_corner.TestTier2Feature9CodeProvenanceBoundaries.test_f9_b05_unauthorized_git_repo_write_prohibition)",
+          "status": "PASS",
+          "elapsed_s": 7.120001828297973e-05,
+          "error": null
+        }
+      ]
+    },
+    {
+      "tier_name": "Tier 3: Pairwise Interactions (15 tests)",
+      "tests_run": 15,
+      "passed": 15,
+      "failed": 0,
+      "errors": 0,
+      "elapsed_s": 0.003123100002994761,
+      "records": [
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_01_crypto_and_wire_pacing_envelope",
+          "name": "test_pair_01_crypto_and_wire_pacing_envelope (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_01_crypto_and_wire_pacing_envelope)",
+          "status": "PASS",
+          "elapsed_s": 6.459999713115394e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_02_nack_recovery_and_ascon_tag_integrity",
+          "name": "test_pair_02_nack_recovery_and_ascon_tag_integrity (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_02_nack_recovery_and_ascon_tag_integrity)",
+          "status": "PASS",
+          "elapsed_s": 0.0014568000042345375,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_03_onnx_zoh_quarantine_under_physical_spoofing",
+          "name": "test_pair_03_onnx_zoh_quarantine_under_physical_spoofing (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_03_onnx_zoh_quarantine_under_physical_spoofing)",
+          "status": "PASS",
+          "elapsed_s": 8.410000009462237e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_04_ftti_budget_under_worst_case_bit_stuffing",
+          "name": "test_pair_04_ftti_budget_under_worst_case_bit_stuffing (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_04_ftti_budget_under_worst_case_bit_stuffing)",
+          "status": "PASS",
+          "elapsed_s": 3.649998689070344e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_05_rest_orchestration_and_relay_fault_mapping",
+          "name": "test_pair_05_rest_orchestration_and_relay_fault_mapping (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_05_rest_orchestration_and_relay_fault_mapping)",
+          "status": "PASS",
+          "elapsed_s": 6.009999196976423e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_06_reassembly_decryption_and_verification_pipeline",
+          "name": "test_pair_06_reassembly_decryption_and_verification_pipeline (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_06_reassembly_decryption_and_verification_pipeline)",
+          "status": "PASS",
+          "elapsed_s": 0.00045960000716149807,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_07_ascon_counter_and_session_rekey_state_machine",
+          "name": "test_pair_07_ascon_counter_and_session_rekey_state_machine (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_07_ascon_counter_and_session_rekey_state_machine)",
+          "status": "PASS",
+          "elapsed_s": 5.440000677481294e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_08_kinematics_normalization_and_subsystem_scoring",
+          "name": "test_pair_08_kinematics_normalization_and_subsystem_scoring (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_08_kinematics_normalization_and_subsystem_scoring)",
+          "status": "PASS",
+          "elapsed_s": 0.0005293000140227377,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_09_relay_burst_drop_and_bitmap_recovery",
+          "name": "test_pair_09_relay_burst_drop_and_bitmap_recovery (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_09_relay_burst_drop_and_bitmap_recovery)",
+          "status": "PASS",
+          "elapsed_s": 3.15000070258975e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_10_multirate_canfd_timing_and_headroom",
+          "name": "test_pair_10_multirate_canfd_timing_and_headroom (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_10_multirate_canfd_timing_and_headroom)",
+          "status": "PASS",
+          "elapsed_s": 1.8999999156221747e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_11_tier1_crypto_gate_and_tier15_invariant_defense",
+          "name": "test_pair_11_tier1_crypto_gate_and_tier15_invariant_defense (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_11_tier1_crypto_gate_and_tier15_invariant_defense)",
+          "status": "PASS",
+          "elapsed_s": 2.169999061152339e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_12_tier15_discrete_invariants_and_security_alert",
+          "name": "test_pair_12_tier15_discrete_invariants_and_security_alert (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_12_tier15_discrete_invariants_and_security_alert)",
+          "status": "PASS",
+          "elapsed_s": 1.9499973859637976e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_13_memory_locking_and_high_ingress_load",
+          "name": "test_pair_13_memory_locking_and_high_ingress_load (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_13_memory_locking_and_high_ingress_load)",
+          "status": "PASS",
+          "elapsed_s": 1.3100012438371778e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_14_end_to_end_latency_model_vs_schedulability_deadlines",
+          "name": "test_pair_14_end_to_end_latency_model_vs_schedulability_deadlines (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_14_end_to_end_latency_model_vs_schedulability_deadlines)",
+          "status": "PASS",
+          "elapsed_s": 1.1500000255182385e-05,
+          "error": null
+        },
+        {
+          "test_id": "test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_15_interdomain_routing_matrix_and_default_deny",
+          "name": "test_pair_15_interdomain_routing_matrix_and_default_deny (test_tier3_pairwise_interactions.TestTier3PairwiseInteractions.test_pair_15_interdomain_routing_matrix_and_default_deny)",
+          "status": "PASS",
+          "elapsed_s": 1.6900012269616127e-05,
+          "error": null
+        }
+      ]
+    },
+    {
+      "tier_name": "Tier 4: Real-World Scenarios (18 tests)",
+      "tests_run": 18,
+      "passed": 18,
+      "failed": 0,
+      "errors": 0,
+      "elapsed_s": 0.04657760000554845,
+      "records": [
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s01_31_scenario_workload_master_schedule",
+          "name": "test_s01_31_scenario_workload_master_schedule (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s01_31_scenario_workload_master_schedule)",
+          "status": "PASS",
+          "elapsed_s": 0.00408029998652637,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s02_canonical_fault_profiles",
+          "name": "test_s02_canonical_fault_profiles (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s02_canonical_fault_profiles)",
+          "status": "PASS",
+          "elapsed_s": 0.0012042000016663224,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s03_monte_carlo_sweep_dynamics",
+          "name": "test_s03_monte_carlo_sweep_dynamics (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s03_monte_carlo_sweep_dynamics)",
+          "status": "PASS",
+          "elapsed_s": 0.001742499996908009,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s04_runtime_threat_injections",
+          "name": "test_s04_runtime_threat_injections (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s04_runtime_threat_injections)",
+          "status": "PASS",
+          "elapsed_s": 0.0018370999896433204,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s05_asil_d_ftti_handshake_latency_budget",
+          "name": "test_s05_asil_d_ftti_handshake_latency_budget (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s05_asil_d_ftti_handshake_latency_budget)",
+          "status": "PASS",
+          "elapsed_s": 0.0013587999856099486,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s06_hard_realtime_memory_locking_invariant",
+          "name": "test_s06_hard_realtime_memory_locking_invariant (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s06_hard_realtime_memory_locking_invariant)",
+          "status": "PASS",
+          "elapsed_s": 0.0017602000152692199,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s07_full_contract1_schema_compliance",
+          "name": "test_s07_full_contract1_schema_compliance (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s07_full_contract1_schema_compliance)",
+          "status": "PASS",
+          "elapsed_s": 0.0035559999814722687,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s08_full_contract2_schema_compliance",
+          "name": "test_s08_full_contract2_schema_compliance (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s08_full_contract2_schema_compliance)",
+          "status": "PASS",
+          "elapsed_s": 0.002454499976010993,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s09_full_contract3_schema_compliance",
+          "name": "test_s09_full_contract3_schema_compliance (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s09_full_contract3_schema_compliance)",
+          "status": "PASS",
+          "elapsed_s": 0.00220320001244545,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s10_contract_validator_rejection_of_corrupt_data",
+          "name": "test_s10_contract_validator_rejection_of_corrupt_data (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s10_contract_validator_rejection_of_corrupt_data)",
+          "status": "PASS",
+          "elapsed_s": 0.006202899996424094,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s11_iso26262_diagnostic_codes_and_safety_states",
+          "name": "test_s11_iso26262_diagnostic_codes_and_safety_states (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s11_iso26262_diagnostic_codes_and_safety_states)",
+          "status": "PASS",
+          "elapsed_s": 0.0023201000003609806,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s12_protocol_goodput_efficiency_calculation",
+          "name": "test_s12_protocol_goodput_efficiency_calculation (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s12_protocol_goodput_efficiency_calculation)",
+          "status": "PASS",
+          "elapsed_s": 0.0022470000258181244,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s13_end_to_end_pqc_boot_attestation_handshake_flow",
+          "name": "test_s13_end_to_end_pqc_boot_attestation_handshake_flow (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s13_end_to_end_pqc_boot_attestation_handshake_flow)",
+          "status": "PASS",
+          "elapsed_s": 0.0022990000143181533,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s14_schedulability_wctt_and_bus_utilization",
+          "name": "test_s14_schedulability_wctt_and_bus_utilization (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s14_schedulability_wctt_and_bus_utilization)",
+          "status": "PASS",
+          "elapsed_s": 0.002259300003061071,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s15_controller_rpc_protocol_and_polling_bounds",
+          "name": "test_s15_controller_rpc_protocol_and_polling_bounds (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s15_controller_rpc_protocol_and_polling_bounds)",
+          "status": "PASS",
+          "elapsed_s": 0.0021616999874822795,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s16_mode_b_zoh_sliding_window_persistence",
+          "name": "test_s16_mode_b_zoh_sliding_window_persistence (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s16_mode_b_zoh_sliding_window_persistence)",
+          "status": "PASS",
+          "elapsed_s": 0.002609600021969527,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s17_multidomain_isolation_across_4_domains",
+          "name": "test_s17_multidomain_isolation_across_4_domains (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s17_multidomain_isolation_across_4_domains)",
+          "status": "PASS",
+          "elapsed_s": 0.002497600013157353,
+          "error": null
+        },
+        {
+          "test_id": "test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s18_acceptance_criteria_traceability",
+          "name": "test_s18_acceptance_criteria_traceability (test_tier4_real_world_scenarios.TestTier4RealWorldScenarios.test_s18_acceptance_criteria_traceability)",
+          "status": "PASS",
+          "elapsed_s": 0.0018500000005587935,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

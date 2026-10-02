@@ -1,7 +1,7 @@
 {
   "milestone": "M3.1",
   "description": "3-Way Transport Protocol Evaluation (Castiglione vs ISO-TP vs 60/4)",
-  "generated_utc": "2026-09-06T16:38:58.923295+00:00",
+  "generated_utc": "2026-09-08T12:28:35.213294+00:00",
   "runtime_environment": {
     "python_version": "3.13.5",
     "numpy_version": "2.2.6",
@@ -15,7 +15,7 @@
   },
   "execution_parameters": {
     "random_seed": 42,
-    "mc_trials_per_point": 0,
+    "mc_trials_per_point": 10000,
     "loss_sweep_points": 11,
     "bitrate_regimes_evaluated": [
       "castiglione_baseline_1mbps",

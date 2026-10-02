@@ -14,7 +14,11 @@ import uuid
 
 from common import ROOT, atomic, PostQuantumAttestation
 from evidence import validate_software, export_arrivals, export_perf_stat
-sys.path.insert(0, str(ROOT / 'Phase 2/Simulation'))
+
+sim_path = ROOT / 'Phase 2/Simulation'
+if not sim_path.exists():
+    sim_path = ROOT.parent / 'Git repo/Phase 2/Simulation'
+sys.path.insert(0, str(sim_path))
 from contracts import columns, profile, validate
 
 TELEMETRY = False
@@ -95,8 +99,6 @@ def execute(domain, scenario, trial, seed):
     status = result['status']
     origin = 'gateway'
     if status=='ERR_RETRY_EXHAUSTION' and ecu['result']['status']=='ERR_TIMEOUT_NACK_WAIT' and ecu['result']['nack_rounds']==0:
-        # This is an observed sender timeout without any accepted NACK, not a
-        # failure code inferred from a scenario label. Keep both endpoint results.
         status, origin = 'ERR_TIMEOUT_NACK_WAIT','ecu'
     terminal_ns = ecu['result']['terminal_ns'] if origin=='ecu' else result['authenticated_ns']
     latency = (terminal_ns-result['started_ns'])/1000
@@ -226,15 +228,22 @@ def main():
     if args.health_only:
         print('All four ECUs, gateway and relay are ready on SocketCAN.')
         return 0
-    import fcntl
+
+    try:
+        import fcntl
+        has_fcntl = True
+    except ImportError:
+        has_fcntl = False
+
     with open('/exports/.run.lock', 'a') as run_lock:
-        try:
-            fcntl.flock(run_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise SystemExit('Another experiment suite is already running.')
+        if has_fcntl:
+            try:
+                fcntl.flock(run_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise SystemExit('Another experiment suite is already running.')
         suite = str(uuid.uuid4())
         out = Path('/exports')/suite
-        out.mkdir()
+        out.mkdir(parents=True, exist_ok=True)
         rows, records, baselines, checks = [], {}, {}, []
         work = [(d,s,0) for s in CANONICAL for d in range(1,5)]
         work += [(1,('persistent',2,CANONICAL[1][2],'SINGLE_FRAME_DROP',[12]),0),
@@ -285,11 +294,21 @@ def main():
         if (out/'candump_since_lab_start.log').exists():
             artifacts.append('candump_since_lab_start.log')
         import subprocess
-        perf = subprocess.run(['perf','stat','-x,','-e','cycles,instructions','--','true'],capture_output=True,text=True)
-        (out/'perf_probe.txt').write_text(perf.stderr)
+        try:
+            perf = subprocess.run(['perf','stat','-x,','-e','cycles,instructions','--','true'],capture_output=True,text=True)
+            perf_code = perf.returncode
+            perf_err = perf.stderr
+        except Exception:
+            perf_code = -1
+            perf_err = "perf not available"
+        (out/'perf_probe.txt').write_text(perf_err)
         artifacts.append('perf_probe.txt')
-        metadata=dict(perf_probe=dict(returncode=perf.returncode,
-                      status='AVAILABLE_PROBE_ONLY' if perf.returncode==0 else 'UNAVAILABLE_PERMISSION_OR_PMU',
+
+        crypto_code_dir = (ROOT/'Phase 1/CAN FD/Crypto Code') if (ROOT/'Phase 1/CAN FD/Crypto Code').exists() else (ROOT.parent/'Git repo/Phase 1/CAN FD/Crypto Code')
+        schemas_file = (ROOT/'Phase 3/config/data_contract_schemas.json') if (ROOT/'Phase 3/config/data_contract_schemas.json').exists() else (ROOT.parent/'Git repo/Phase 3/config/data_contract_schemas.json')
+
+        metadata=dict(perf_probe=dict(returncode=perf_code,
+                      status='AVAILABLE_PROBE_ONLY' if perf_code==0 else 'UNAVAILABLE_PERMISSION_OR_PMU',
                       contract1_complete=True), arrivals=arrivals, profile='phase3-docker-socketcan-v2', suite=suite, created_epoch_ns=time.time_ns(),
                       transport='Linux CAN-FD vxcan, independent Docker namespaces; no datagram fallback',
                       python=sys.version, kernel=platform.release(),
@@ -300,9 +319,8 @@ def main():
                       runs=records, scenario_checks=checks, attacks=attacks,
                       strict_phase3_errors=validate(out/'fault_recovery_runs.csv',strict=True,enforce_delivered_requests=False),
                       sha256={name:hashlib.sha256((out/name).read_bytes()).hexdigest() for name in artifacts},
-                      source_sha256={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest()
-                                     for p in [*Path.cwd().glob('*.py'), *list((ROOT/'Phase 1/CAN FD/Crypto Code').glob('*.py')),
-                                               ROOT/'Phase 3/config/data_contract_schemas.json']})
+                      source_sha256={str(p.relative_to(ROOT) if p.is_relative_to(ROOT) else p.name):hashlib.sha256(p.read_bytes()).hexdigest()
+                                     for p in [*Path.cwd().glob('*.py'), *list(crypto_code_dir.glob('*.py')), schemas_file]})
         (out/'manifest.json').write_text(json.dumps(metadata,indent=2))
         errors=audit(out)
         passed=not errors and all(c['passed'] for c in checks+attacks)

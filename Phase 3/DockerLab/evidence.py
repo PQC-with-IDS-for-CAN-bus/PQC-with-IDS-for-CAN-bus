@@ -47,7 +47,10 @@ def validate_software(path, validator):
 
 
 def export_arrivals(out, events, records):
-    specs = json.loads((ROOT/'Phase 3/config/data_contract_schemas.json').read_text())['contracts']['tcpdump_latency_summary']['columns']
+    schema_path = ROOT / 'Phase 3/config/data_contract_schemas.json'
+    if not schema_path.exists():
+        schema_path = ROOT.parent / 'Git repo/Phase 3/config/data_contract_schemas.json'
+    specs = json.loads(schema_path.read_text())['contracts']['tcpdump_latency_summary']['columns']
     rows, clocks, previous, rounds = [], {}, {}, {}
     identifiers = {run:f'SESS_DOCKER_{i:06d}' for i,run in enumerate(records,1)}
     
@@ -109,7 +112,10 @@ def export_arrivals(out, events, records):
 
 def export_perf_stat(out, records, measured_timings=None):
     """Exports compliant Contract 1 (perf_stat_summary.csv) matching ASIL-D strict zero page fault rule."""
-    specs = json.loads((ROOT/'Phase 3/config/data_contract_schemas.json').read_text())['contracts']['perf_stat_summary']['columns']
+    schema_path = ROOT / 'Phase 3/config/data_contract_schemas.json'
+    if not schema_path.exists():
+        schema_path = ROOT.parent / 'Git repo/Phase 3/config/data_contract_schemas.json'
+    specs = json.loads(schema_path.read_text())['contracts']['perf_stat_summary']['columns']
     import datetime
     now_iso = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
@@ -176,4 +182,3 @@ def export_perf_stat(out, records, measured_timings=None):
         writer = csv.DictWriter(stream, fieldnames=specs)
         writer.writeheader()
         writer.writerows(rows)
-

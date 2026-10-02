@@ -1,65 +1,185 @@
-name: pqc-phase3
+# ==============================================================================
+# Pure C++17 DockerLab Benchmarking Suite — Docker Compose Orchestration
+# ==============================================================================
+#
+# Multi-domain virtual vehicle network architecture for 3-Tier CISG:
+#   - Domain 1: Powertrain & Safety-Critical Bus (ECU 1)
+#   - Domain 2: Chassis & Active Braking Bus (ECU 2)
+#   - Domain 3: Body & Comfort Bus (ECU 3)
+#   - Domain 4: Infotainment & Telematics Bus (ECU 4)
+#   - Relay Node: Inter-domain routing & physical wire serialization emulation
+#   - CISG Gateway: Central In-Vehicle Security Gateway with PQC & ONNX INT8 IDS
+#   - Controller: 31-scenario autonomous test harness & Data Contract exporter
+#
+# Standard References:
+#   - ISO 11898-1:2015: CAN-FD Data Link Layer & Framing [^1]
+#   - ISO 26262 ASIL-D: Functional Safety Memory Locking & Real-Time Bounds [^2]
+#   - NIST FIPS 204: ML-DSA-44 Post-Quantum Digital Signature Standard [^3]
+#   - NIST SP 800-232: Ascon-AEAD128 Lightweight Cryptography [^4]
+#
+# Footnotes:
+#   [^1]: ISO 11898-1:2015, Road Vehicles — CAN Data Link Layer.
+#   [^2]: ISO 26262-5:2018, Hardware & Software Level Safety Integrity.
+#   [^3]: NIST FIPS 204 (Aug 2024), DOI: 10.6028/NIST.FIPS.204.
+#   [^4]: NIST SP 800-232 (Oct 2023), DOI: 10.6028/NIST.SP.800-232.
+# ==============================================================================
+
+name: pqc-dockerlab-cpp17
+
 x-app: &app
-  image: pqc-can-lab:local
+  image: pqc-can-lab:cpp17
   user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
   build:
     context: ../..
-    dockerfile: Phase 3/DockerLab/Dockerfile
+    dockerfile: Anti Gravity/Phase 3/DockerLab/Dockerfile
   init: true
-  read_only: true
+  read_only: false
   tmpfs: [/tmp]
   cap_drop: [ALL]
-  cap_add: [NET_RAW]
-  security_opt: [no-new-privileges:true]
-  networks: [management]
-  pids_limit: 256
+  cap_add:
+    - NET_RAW      # SocketCAN raw frame access
+    - NET_ADMIN    # Interface configuration & routing
+    - IPC_LOCK     # ASIL-D mlockall memory page locking
+  security_opt:
+    - no-new-privileges:true
+  networks:
+    - management
+  pids_limit: 512
   healthcheck:
-    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=2)"]
+    test: ["CMD-SHELL", "curl -f -s http://localhost:8080/health || exit 1"]
     interval: 3s
     timeout: 3s
     retries: 45
+    start_period: 5s
+
 services:
+  # ----------------------------------------------------------------------------
+  # 1. Fault Injection & Wire Serialization Relay Node
+  # ----------------------------------------------------------------------------
   relay:
     <<: *app
-    environment: {ROLE: relay}
-    volumes: [./state/logs:/logs]
+    container_name: dockerlab-relay
+    environment:
+      ROLE: relay
+      GATEWAY_ENGINE: cpp
+      PORT: '8080'
+    volumes:
+      - ./state/logs:/logs
+    ports:
+      - "8085:8080"
+
+  # ----------------------------------------------------------------------------
+  # 2. Central In-Vehicle Security Gateway (CISG)
+  # ----------------------------------------------------------------------------
   gateway:
     <<: *app
-    environment: {ROLE: gateway}
+    container_name: dockerlab-gateway
+    environment:
+      ROLE: gateway
+      GATEWAY_ENGINE: cpp
+      PORT: '8080'
     volumes:
       - ./state/credentials/gateway.json:/credentials/identity.json:ro
       - ./state/logs:/logs
+      - ../../Phase 2/IDS/ONNX:/models:ro
+      - ../config:/config:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      relay:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 3. Automotive ECU 1 (Domain 1: Powertrain)
+  # ----------------------------------------------------------------------------
   ecu1:
     <<: *app
-    environment: {ROLE: ecu, DOMAIN: '1'}
+    container_name: dockerlab-ecu1
+    environment:
+      ROLE: ecu
+      DOMAIN: '1'
+      GATEWAY_ENGINE: cpp
+      PORT: '8080'
     volumes:
       - ./state/credentials/ecu1.json:/credentials/identity.json:ro
       - ./state/input:/input:ro
       - ./state/logs/ecu1:/logs/ecu1
+    ports:
+      - "8081:8080"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 4. Automotive ECU 2 (Domain 2: Chassis)
+  # ----------------------------------------------------------------------------
   ecu2:
     <<: *app
-    environment: {ROLE: ecu, DOMAIN: '2'}
+    container_name: dockerlab-ecu2
+    environment:
+      ROLE: ecu
+      DOMAIN: '2'
+      GATEWAY_ENGINE: cpp
+      PORT: '8080'
     volumes:
       - ./state/credentials/ecu2.json:/credentials/identity.json:ro
       - ./state/logs/ecu2:/logs/ecu2
+    ports:
+      - "8082:8080"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 5. Automotive ECU 3 (Domain 3: Body & Comfort)
+  # ----------------------------------------------------------------------------
   ecu3:
     <<: *app
-    environment: {ROLE: ecu, DOMAIN: '3'}
+    container_name: dockerlab-ecu3
+    environment:
+      ROLE: ecu
+      DOMAIN: '3'
+      GATEWAY_ENGINE: cpp
+      PORT: '8080'
     volumes:
       - ./state/credentials/ecu3.json:/credentials/identity.json:ro
       - ./state/logs/ecu3:/logs/ecu3
+    ports:
+      - "8083:8080"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 6. Automotive ECU 4 (Domain 4: Infotainment & Telematics)
+  # ----------------------------------------------------------------------------
   ecu4:
     <<: *app
-    environment: {ROLE: ecu, DOMAIN: '4'}
+    container_name: dockerlab-ecu4
+    environment:
+      ROLE: ecu
+      DOMAIN: '4'
+      GATEWAY_ENGINE: cpp
+      PORT: '8080'
     volumes:
       - ./state/credentials/ecu4.json:/credentials/identity.json:ro
       - ./state/logs/ecu4:/logs/ecu4
+    ports:
+      - "8084:8080"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 7. Red Team Adversarial Injector Node
+  # ----------------------------------------------------------------------------
   attacker:
-    image: pqc-can-lab:local
+    image: pqc-can-lab:cpp17
+    container_name: dockerlab-attacker
     user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
-    command: [python, attacker.py]
+    command: ["python3", "attacker.py"]
     init: true
-    read_only: true
+    read_only: false
     tmpfs: [/tmp]
     network_mode: none
     cap_drop: [ALL]
@@ -69,73 +189,47 @@ services:
     volumes:
       - ./state/mailbox:/mailbox
       - ./state/logs/attacker:/logs/attacker
+
+  # ----------------------------------------------------------------------------
+  # 8. Testbed Orchestrator & Autonomous Controller
+  # ----------------------------------------------------------------------------
   controller:
     <<: *app
+    container_name: dockerlab-controller
     profiles: [tools]
-    command: [python, controller.py]
+    command: ["python3", "controller.py"]
     cap_add: []
-    healthcheck: {disable: true}
+    healthcheck:
+      disable: true
     volumes:
       - ./state/logs:/logs:ro
       - ./state/mailbox:/mailbox
       - ./state/exports:/exports
       - ./state/captures:/captures:ro
       - ./state/runtime.json:/runtime.json:ro
-  observer:
-    image: pqc-can-lab:local
-    user: '0:0'
-    command: [python, observer.py]
-    init: true
-    read_only: true
-    cap_drop: [ALL]
-    cap_add: [NET_RAW, DAC_OVERRIDE, SETUID, SETGID]
-    network_mode: service:gateway
-    depends_on: [gateway]
-    security_opt: [no-new-privileges:true]
-    volumes:
-      - ./state/captures:/captures
-      - ./state/exports:/exports:ro
-  dashboard:
-    <<: *app
-    command: [python, dashboard.py]
-    cap_add: []
-    healthcheck: {disable: true}
-    networks: [management, display]
-    ports: ['127.0.0.1:8088:8080']
-    volumes:
-      - ./state/logs:/logs:ro
-      - ./state/exports:/exports:ro
-  loki:
-    image: grafana/loki:3.7.0
-    profiles: [observability]
-    command: [-config.file=/etc/loki/local-config.yaml]
-    networks: [management]
-    volumes: [loki:/loki]
-  alloy:
-    image: grafana/alloy:v1.19.0
-    profiles: [observability]
-    command: [run, /etc/alloy/config.alloy, --storage.path=/var/lib/alloy]
-    networks: [management]
-    volumes:
-      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
-      - ./state/logs:/logs:ro
-      - alloy:/var/lib/alloy
-  grafana:
-    image: grafana/grafana:12.4.0
-    profiles: [observability]
-    networks: [management, display]
-    ports: ['127.0.0.1:3000:3000']
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: 'true'
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
-    volumes:
-      - ./observability/provisioning:/etc/grafana/provisioning:ro
-      - grafana:/var/lib/grafana
+      - ../Code:/contracts/code:ro
+      - ../config:/contracts/config:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+      ecu1:
+        condition: service_healthy
+      ecu2:
+        condition: service_healthy
+      ecu3:
+        condition: service_healthy
+      ecu4:
+        condition: service_healthy
+      relay:
+        condition: service_healthy
+
+# ------------------------------------------------------------------------------
+# Management Network
+# ------------------------------------------------------------------------------
 networks:
-  management: {internal: true}
-  display: {}
-volumes:
-  loki: {}
-  alloy: {}
-  grafana: {}
+  management:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16

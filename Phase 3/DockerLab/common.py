@@ -10,7 +10,11 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'Phase 1/CAN FD/Crypto Code'))
+crypto_path = ROOT / 'Phase 1/CAN FD/Crypto Code'
+if not crypto_path.exists():
+    crypto_path = ROOT.parent / 'Git repo/Phase 1/CAN FD/Crypto Code'
+sys.path.insert(0, str(crypto_path))
+
 from crypto_engine import AsconAEAD128Engine, KeyDerivation, PostQuantumAttestation, SessionManager
 from canfd_schema import ChallengeFrame, AttestationDeliveryManager, IndexedAttestationFrame, KeyDeliveryFrame
 
@@ -62,7 +66,6 @@ def evaluate_routing_policy(src_domain: int, dst_domain: int, can_id: int = 0) -
     if src_class == 'INFOTAINMENT' and dst_class == 'SAFETY':
         return False # STRICTLY BLOCKED (highest priority air-gap rule)
     return False
-
 
 
 def atomic(path, value):
