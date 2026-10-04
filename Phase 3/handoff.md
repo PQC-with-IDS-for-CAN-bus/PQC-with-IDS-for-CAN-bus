@@ -101,16 +101,16 @@ When you run `controller.py`, record your metrics and compare them directly agai
 
 | Metric Name | Legacy Python (WSL2) | Kaustuv Mock Prototype | **Our Verified C++ Baseline** | **Your Live EndeavourOS Run** | Tolerance / Pass Condition |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **Nominal Handshake Latency** | $65.12\text{ ms}$ (FAIL) | $1.85\text{ ms}$ (Mock) | **$26.18\text{ ms}$** | `24.11 ms` | **$24.0\text{ ms} - 28.0\text{ ms}$** |
-| **ISO 26262 ASIL-D FTTI Margin** | $-15.12\text{ ms}$ (Violation) | $+48.15\text{ ms}$ (Mock) | **$+23.82\text{ ms}$** | `+25.89 ms` | **$> +20.0\text{ ms}$ ($100\%$ Safe)** |
-| **ML-DSA-44 Sign Latency** | $39.10\text{ ms}$ | $0.12\text{ ms}$ (Dummy) | **$7.65\text{ ms}$** | `7.65 ms` | **$6.0\text{ ms} - 8.5\text{ ms}$** |
-| **ML-DSA-44 Verify Latency** | $12.41\text{ ms}$ | Omitted | **$2.85\text{ ms}$** | `2.85 ms` | **$2.5\text{ ms} - 3.5\text{ ms}$** |
-| **CAN-FD Wire Serialization (41F)** | $10.25\text{ ms}$ | $0.12\text{ ms}$ (RAM copy) | **$13.59\text{ ms}$** | `13.61 ms` | **$13.5\text{ ms} - 14.5\text{ ms}$** |
-| **Ascon SP 800-232 Tag Verify** | $550\ \mu\text{s}$ | $0.52\ \mu\text{s}$ (LWC 1.2) | **$< 15\ \mu\text{s}$** | `< 15 \mu\text{s}` | **$< 20\ \mu\text{s}$** |
-| **Major Page Faults (`page-faults-major`)** | $> 120$ | $0$ (claimed) | **$0$ (`mlockall`)** | `0` | **STRICTLY $0$** |
-| **Peak Process RSS** | $\approx 250\text{ MB}$ | $\approx 12\text{ MB}$ | **$8.6\text{ MB}$** | `8.6 MB` | **$< 12.0\text{ MB}$** |
-| **Post-Attack Recovery False Alarms** | $29\text{ frames}$ ($16.1\%$ FPR) | $0\text{ frames}$ (mock) | **$0\text{ frames}$ ($0.0\%$ FPR)** | `0 frames` | **STRICTLY $0$ (Mode B ZOH)** |
-| **Attack Recovery F1-Score** | $0.8614$ | $1.0000$ (mock) | **$1.0000$** | `1.0000` | **$1.0000$** |
+| **Nominal Handshake Latency** | $65.12\text{ ms}$ (FAIL) | $1.85\text{ ms}$ (Mock) | **$26.18\text{ ms}$** | `[ RECORD LIVE ]` | **$24.0\text{ ms} - 28.0\text{ ms}$** |
+| **ISO 26262 ASIL-D FTTI Margin** | $-15.12\text{ ms}$ (Violation) | $+48.15\text{ ms}$ (Mock) | **$+23.82\text{ ms}$** | `[ RECORD LIVE ]` | **$> +20.0\text{ ms}$ ($100\%$ Safe)** |
+| **ML-DSA-44 Sign Latency** | $39.10\text{ ms}$ | $0.12\text{ ms}$ (Dummy) | **$7.65\text{ ms}$** | `[ RECORD LIVE ]` | **$6.0\text{ ms} - 8.5\text{ ms}$** |
+| **ML-DSA-44 Verify Latency** | $12.41\text{ ms}$ | Omitted | **$2.85\text{ ms}$** | `[ RECORD LIVE ]` | **$2.5\text{ ms} - 3.5\text{ ms}$** |
+| **CAN-FD Wire Serialization (41F)** | $10.25\text{ ms}$ | $0.12\text{ ms}$ (RAM copy) | **$13.59\text{ ms}$** | `[ RECORD LIVE ]` | **$13.5\text{ ms} - 14.5\text{ ms}$** |
+| **Ascon SP 800-232 Tag Verify** | $550\ \mu\text{s}$ | $0.52\ \mu\text{s}$ (LWC 1.2) | **$< 15\ \mu\text{s}$** | `[ RECORD LIVE ]` | **$< 20\ \mu\text{s}$** |
+| **Major Page Faults (`page-faults-major`)** | $> 120$ | $0$ (claimed) | **$0$ (`mlockall`)** | `[ RECORD LIVE ]` | **STRICTLY $0$** |
+| **Peak Process RSS** | $\approx 250\text{ MB}$ | $\approx 12\text{ MB}$ | **$8.6\text{ MB}$** | `[ RECORD LIVE ]` | **$< 12.0\text{ MB}$** |
+| **Post-Attack Recovery False Alarms** | $29\text{ frames}$ ($16.1\%$ FPR) | $0\text{ frames}$ (mock) | **$0\text{ frames}$ ($0.0\%$ FPR)** | `[ RECORD LIVE ]` | **STRICTLY $0$ (Mode B ZOH)** |
+| **Attack Recovery F1-Score** | $0.8614$ | $1.0000$ (mock) | **$1.0000$** | `[ RECORD LIVE ]` | **$1.0000$** |
 
 ---
 
@@ -134,10 +134,10 @@ To verify the veracity and authenticity of the code without running blind:
 Once you have rerun `controller.py` on EndeavourOS and confirmed that your live handshake timing matches the **$\approx 26.18\text{ ms}$** baseline with **zero page faults** and **zero schema errors**, sign off below:
 
 ```
-[X] LIVE DOCKER RUN COMPLETED ON ENDEAVOUR_OS
-[X] MEASURED HANDSHAKE LATENCY: 24.11 ms (Target: 24-28 ms)
-[X] FTTI SAFETY MARGIN: +25.89 ms (Target: > +20 ms)
-[X] MAJOR PAGE FAULTS: 0
-[X] DATA CONTRACTS VALIDATED: 100% PASS
-[X] SIGNED OFF BY: Kaustuv (23BDS1060) | Date: October 4, 2026
+[ ] LIVE DOCKER RUN COMPLETED ON ENDEAVOUR_OS
+[ ] MEASURED HANDSHAKE LATENCY: __________ ms (Target: 24-28 ms)
+[ ] FTTI SAFETY MARGIN: +__________ ms (Target: > +20 ms)
+[ ] MAJOR PAGE FAULTS: 0
+[ ] DATA CONTRACTS VALIDATED: 100% PASS
+[ ] SIGNED OFF BY: Kaustuv (23BDS1060) | Date: _______________
 ```

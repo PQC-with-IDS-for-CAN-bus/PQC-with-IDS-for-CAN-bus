@@ -289,6 +289,12 @@ int main(int argc, char* argv[]) {
     int domain_id = 1;
     uint16_t port = 8080;
     std::string iface_name = "";
+    if (const char* env_domain = std::getenv("DOMAIN")) {
+        try { domain_id = std::stoi(env_domain); } catch (...) {}
+    }
+    if (const char* env_port = std::getenv("PORT")) {
+        try { port = static_cast<uint16_t>(std::stoi(env_port)); } catch (...) {}
+    }
     if (const char* env_iface = std::getenv("CAN_INTERFACE")) {
         iface_name = env_iface;
     }

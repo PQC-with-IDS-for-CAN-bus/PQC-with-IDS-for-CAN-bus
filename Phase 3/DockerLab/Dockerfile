@@ -91,7 +91,9 @@ RUN curl -sSL https://github.com/microsoft/onnxruntime/releases/download/v1.20.1
 # ------------------------------------------------------------------------------
 RUN pip3 install --no-cache-dir \
     numpy==1.26.4 \
-    onnxruntime==1.20.1
+    onnxruntime==1.20.1 \
+    cryptography \
+    dilithium-py
 
 # ------------------------------------------------------------------------------
 # 5. Copy Codebase, Models, Configurations, and Build Pure C++17 Targets
