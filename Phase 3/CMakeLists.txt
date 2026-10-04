@@ -55,7 +55,7 @@ add_compile_options(
 
 # Optional platform-specific architecture vectorization when available on host
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    add_compile_options(-mavx2)
+    # add_compile_options(-mavx2)
 endif()
 
 # ------------------------------------------------------------------------------

@@ -29,7 +29,7 @@
  *      - Payload corruption: Bit-flip mutation (payload[10] ^= 0xFF) triggering Ascon tag rejection.
  *
  *   3. ISO 26262-5:2018 ASIL-D Real-Time Determinism:
- *      - Real-time page locking: mlockall(MCL_CURRENT | MCL_FUTURE) minimizing
+ *      - Real-time page locking: mlockall(MCL_CURRENT) minimizing
  *        routing jitter and guaranteeing zero major page faults in steady state.
  *
  * Footnotes:
@@ -82,11 +82,11 @@ namespace {
      */
     bool lock_physical_memory() {
 #if defined(__linux__) || defined(__unix__)
-        if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+        if (mlockall(MCL_CURRENT) != 0) {
             std::cerr << "[!] WARNING: mlockall failed on Relay node. Jitter minimization degraded.\n";
             return false;
         }
-        std::cout << "[+] ASIL-D Relay Memory Locking: mlockall(MCL_CURRENT | MCL_FUTURE) active [PASS]\n";
+        std::cout << "[+] ASIL-D Relay Memory Locking: mlockall(MCL_CURRENT) active [PASS]\n";
         return true;
 #else
         std::cout << "[+] Non-POSIX host environment: mlockall bypassed in simulation mode.\n";

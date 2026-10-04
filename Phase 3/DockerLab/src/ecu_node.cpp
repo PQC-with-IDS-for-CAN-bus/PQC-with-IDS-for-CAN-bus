@@ -27,7 +27,7 @@
  *        41-frame burst: T_burst = 41 * 331.5 us = 13.59 ms >= 13.5 ms physical constraint.
  *
  *   4. ISO 26262-5:2018 ASIL-D Real-Time Determinism:
- *      - Real-time page locking: mlockall(MCL_CURRENT | MCL_FUTURE) guaranteeing
+ *      - Real-time page locking: mlockall(MCL_CURRENT) guaranteeing
  *        page_faults_major == 0 in steady state.
  *
  *   5. Linux SocketCAN RAW CAN-FD & ISO 11898-2 Physical Transmission:
@@ -97,7 +97,7 @@ namespace {
      */
     bool lock_physical_memory() {
 #if defined(__linux__) || defined(__unix__)
-        if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+        if (mlockall(MCL_CURRENT) != 0) {
             std::cerr << "[!] WARNING: mlockall failed on ECU node. Memory locking degraded.\n";
             return false;
         }

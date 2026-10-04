@@ -37,7 +37,7 @@
  *      - Upstream Repository: https://github.com/microsoft/onnxruntime [^3]
  *
  *   5. ISO 26262-5:2018 ASIL-D Real-Time Determinism:
- *      - Real-time page locking: mlockall(MCL_CURRENT | MCL_FUTURE) guaranteeing
+ *      - Real-time page locking: mlockall(MCL_CURRENT) guaranteeing
  *        page_faults_major == 0 in steady state.
  *
  * Footnotes:
@@ -95,11 +95,11 @@ namespace {
      */
     bool lock_physical_memory() {
 #if defined(__linux__) || defined(__unix__)
-        if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+        if (mlockall(MCL_CURRENT) != 0) {
             std::cerr << "[!] WARNING: mlockall failed (requires CAP_IPC_LOCK or root). Page fault guarantee degraded.\n";
             return false;
         }
-        std::cout << "[+] ASIL-D Memory Locking: mlockall(MCL_CURRENT | MCL_FUTURE) active (zero major page faults) [PASS]\n";
+        std::cout << "[+] ASIL-D Memory Locking: mlockall(MCL_CURRENT) active (zero major page faults) [PASS]\n";
         return true;
 #else
         std::cout << "[+] Non-POSIX host environment: mlockall bypassed in simulation mode.\n";

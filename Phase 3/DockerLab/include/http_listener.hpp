@@ -203,12 +203,43 @@ private:
     }
 
     inline void handle_client(socket_t client_fd) {
+        std::string raw_request;
         char buffer[4096];
-        int bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-        if (bytes_read <= 0) return;
+        size_t header_end = std::string::npos;
+        size_t content_length = 0;
 
-        buffer[bytes_read] = '\0';
-        std::string raw_request(buffer, bytes_read);
+        while (true) {
+            int n = recv(client_fd, buffer, sizeof(buffer), 0);
+            if (n <= 0) break;
+            raw_request.append(buffer, n);
+
+            if (header_end == std::string::npos) {
+                header_end = raw_request.find("\r\n\r\n");
+                if (header_end != std::string::npos) {
+                    std::string header_part = raw_request.substr(0, header_end);
+                    size_t cl_pos = header_part.find("Content-Length:");
+                    if (cl_pos == std::string::npos) cl_pos = header_part.find("content-length:");
+                    if (cl_pos != std::string::npos) {
+                        size_t val_start = header_part.find(':', cl_pos) + 1;
+                        size_t val_end = header_part.find("\r\n", val_start);
+                        std::string cl_str = header_part.substr(val_start, val_end - val_start);
+                        while (!cl_str.empty() && (cl_str.front() == ' ' || cl_str.front() == '\t')) cl_str.erase(cl_str.begin());
+                        try {
+                            content_length = std::stoul(cl_str);
+                        } catch (...) { content_length = 0; }
+                    }
+                }
+            }
+
+            if (header_end != std::string::npos) {
+                size_t body_bytes_received = raw_request.size() - (header_end + 4);
+                if (body_bytes_received >= content_length) {
+                    break;
+                }
+            }
+        }
+
+        if (raw_request.empty()) return;
 
         HttpRequest req = parse_request(raw_request);
         HttpResponse resp;
