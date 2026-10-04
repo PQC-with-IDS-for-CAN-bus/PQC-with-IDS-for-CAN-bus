@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "ingestion_timestamp_utc": "2026-10-02T08:48:30.314518+00:00",
-    "provenance_mode": "MOCK_CALIBRATED_FIXTURES",
+    "ingestion_timestamp_utc": "2026-10-04T06:11:44.684340+00:00",
+    "provenance_mode": "LIVE_EMPIRICAL_TELEMETRY",
     "standards_conformance": [
       "ISO 11898-1:2015 (CAN-FD)",
       "ISO 15765-2:2016 (ISO-TP)",
