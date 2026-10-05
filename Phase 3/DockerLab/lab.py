@@ -10,7 +10,7 @@ import sys
 HERE = Path(__file__).resolve().parent
 os.environ['LAB_UID'] = str(os.getuid() if hasattr(os,'getuid') else 1000)
 os.environ['LAB_GID'] = str(os.getgid() if hasattr(os,'getgid') else 1000)
-IMAGE = 'pqc-can-lab:local'
+IMAGE = 'pqc-can-lab:cpp17'
 NODES = ['relay','gateway','ecu1','ecu2','ecu3','ecu4','attacker']
 SERVICES = NODES + ['dashboard','observer']
 
@@ -20,7 +20,7 @@ def compose(*args, capture=False):
     return run(['docker','compose',*args], capture)
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('action', choices=['up','down','run','status','logs','observe','validate'])
+parser.add_argument('action', choices=['up','down','run','status','logs','observe','validate','topology'])
 parser.add_argument('--telemetry', type=Path, help='Complete recorded raw9 JSON; copied into local input mount')
 parser.add_argument('--monte-carlo', type=int, default=5)
 args = parser.parse_args()
@@ -33,7 +33,7 @@ if args.action == 'up':
     compose('build','relay')
     if not (state/'credentials/gateway.json').exists():
         run(['docker','run','--rm','--network','none','--user',os.environ['LAB_UID']+':'+os.environ['LAB_GID'],
-             '-v',f'{state}/credentials:/enrollment',IMAGE,'python','provision.py'])
+             '-v',f'{state}/credentials:/enrollment',IMAGE,'python3','provision.py'])
     runtime = dict(image_id=run(['docker','image','inspect',IMAGE,'--format','{{.Id}}'],True).stdout.strip(),
                    docker=run(['docker','version','--format','{{.Server.Version}}'],True).stdout.strip())
     (state/'runtime.json').write_text(json.dumps(runtime,indent=2))
@@ -45,12 +45,23 @@ if args.action == 'up':
     try:
         run(['docker','run','--rm','--network','host','--pid','host','--cap-drop','ALL',
              '--cap-add','NET_ADMIN','--cap-add','SYS_ADMIN','--cap-add','SYS_PTRACE',
-             '--security-opt','apparmor=unconfined',IMAGE,'python','topology.py',json.dumps(pids)])
-        compose('run','--rm','controller','python','controller.py','--health-only')
+             '--security-opt','apparmor=unconfined',IMAGE,'python3','topology.py',json.dumps(pids)])
+        compose('run','--rm','controller','python3','controller.py','--health-only')
     except subprocess.CalledProcessError:
         print('Topology/startup failed. No transport fallback used. Inspect logs, then run lab.py down.', file=sys.stderr)
         raise
     print('Live dashboard: http://localhost:8088\nRun experiments: python3 lab.py run')
+elif args.action == 'topology':
+    pids = {}
+    for service in NODES:
+        cid = compose('ps','-q',service,capture=True).stdout.strip()
+        if not cid:
+            sys.exit(f'Service {service} is not running. Please start the cluster first.')
+        pids[service] = int(run(['docker','inspect','-f','{{.State.Pid}}',cid], True).stdout)
+    run(['docker','run','--rm','--network','host','--pid','host','--cap-drop','ALL',
+         '--cap-add','NET_ADMIN','--cap-add','SYS_ADMIN','--cap-add','SYS_PTRACE',
+         '--security-opt','apparmor=unconfined',IMAGE,'python3','topology.py',json.dumps(pids)])
+    print('[+] CAN topology created successfully.')
 elif args.action == 'down':
     compose('--profile','observability','down')
 elif args.action == 'run':

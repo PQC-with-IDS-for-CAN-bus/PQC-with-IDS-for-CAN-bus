@@ -1,4 +1,1 @@
-Error:
-No permission to enable cycles event.
-
-
+perf not available

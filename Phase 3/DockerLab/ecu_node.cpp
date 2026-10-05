@@ -70,6 +70,7 @@
 #include <sys/socket.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
+#include <poll.h>
 #endif
 
 // Modular Component Headers
@@ -168,6 +169,19 @@ namespace {
     }
 
     /**
+     * @brief Helper to convert hex string to byte vector.
+     */
+    inline std::vector<uint8_t> hex_to_bytes(const std::string& hex) {
+        std::vector<uint8_t> bytes;
+        bytes.reserve(hex.length() / 2);
+        for (size_t i = 0; i + 1 < hex.length(); i += 2) {
+            char byte_chars[3] = { hex[i], hex[i+1], '\0' };
+            bytes.push_back(static_cast<uint8_t>(std::strtoul(byte_chars, nullptr, 16)));
+        }
+        return bytes;
+    }
+
+    /**
      * @brief Log frame transmission event to JSONL file for testbed controller compliance.
      */
     void log_tx_event(const std::string& run_id, int domain, const std::string& iface,
@@ -248,8 +262,20 @@ namespace {
                 continue;
             }
 
+            int loopback = 0;
+            setsockopt(s, SOL_CAN_RAW, CAN_RAW_LOOPBACK, &loopback, sizeof(loopback));
+
             int sndbuf = 1024 * 1024;
             setsockopt(s, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
+            int rcvbuf = 1024 * 1024;
+            setsockopt(s, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+
+            struct can_filter rfilter[2];
+            rfilter[0].can_id = 0x201;
+            rfilter[0].can_mask = CAN_SFF_MASK;
+            rfilter[1].can_id = 0x203;
+            rfilter[1].can_mask = CAN_SFF_MASK;
+            setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter));
 
             struct ifreq ifr{};
             std::strncpy(ifr.ifr_name, iface.c_str(), IFNAMSIZ - 1);
@@ -325,8 +351,60 @@ int main(int argc, char* argv[]) {
     cisg::pqc::MLDSA44Engine mldsa_engine;
     cisg::pqc::PublicKey pk{};
     cisg::pqc::SecretKey sk{};
-    if (mldsa_engine.generate_keypair(pk, sk)) {
-        std::cout << "[+] Generated authentic NIST FIPS 204 ML-DSA-44 Keypair (PK: 1312B, SK: 2560B) [PASS]\n";
+    bool key_loaded = false;
+
+    // Check credential paths for enrolled identity
+    std::vector<std::string> cred_paths = {
+        "/credentials/identity.json",
+        "./state/credentials/ecu" + std::to_string(domain_id) + ".json",
+        "../state/credentials/ecu" + std::to_string(domain_id) + ".json"
+    };
+    for (const auto& cp : cred_paths) {
+        std::ifstream cfs(cp);
+        if (cfs.is_open()) {
+            std::string content((std::istreambuf_iterator<char>(cfs)), std::istreambuf_iterator<char>());
+            std::string sk_hex = extract_json_str(content, "secret_key");
+            if (sk_hex.length() >= cisg::pqc::MLDSA44Constants::SECRET_KEY_BYTES * 2) {
+                auto sk_vec = hex_to_bytes(sk_hex);
+                if (sk_vec.size() >= cisg::pqc::MLDSA44Constants::SECRET_KEY_BYTES) {
+                    std::memcpy(sk.data(), sk_vec.data(), cisg::pqc::MLDSA44Constants::SECRET_KEY_BYTES);
+                    key_loaded = true;
+                    std::cout << "[+] Loaded enrolled NIST FIPS 204 ML-DSA-44 Identity from " << cp << " [PASS]\n";
+                    break;
+                }
+            }
+        }
+    }
+
+    // Try loading matching public key from gateway.json for VirtualCANBus
+    std::vector<std::string> gw_paths = {
+        "/credentials/gateway.json",
+        "./state/credentials/gateway.json",
+        "../state/credentials/gateway.json"
+    };
+    for (const auto& gp : gw_paths) {
+        std::ifstream gfs(gp);
+        if (gfs.is_open()) {
+            std::string content((std::istreambuf_iterator<char>(gfs)), std::istreambuf_iterator<char>());
+            std::string d_tag = "\"" + std::to_string(domain_id) + "\"";
+            size_t d_pos = content.find(d_tag);
+            if (d_pos != std::string::npos) {
+                std::string pk_hex = extract_json_str(content.substr(d_pos), "public_key");
+                if (pk_hex.length() >= cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES * 2) {
+                    auto pk_vec = hex_to_bytes(pk_hex);
+                    if (pk_vec.size() >= cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES) {
+                        std::memcpy(pk.data(), pk_vec.data(), cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES);
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    if (!key_loaded) {
+        if (mldsa_engine.generate_keypair(pk, sk)) {
+            std::cout << "[+] Generated ephemeral NIST FIPS 204 ML-DSA-44 Keypair (PK: 1312B, SK: 2560B) [PASS]\n";
+        }
     }
 
     // Register authentic ECU public key in VirtualCANBus singleton
@@ -355,8 +433,19 @@ int main(int argc, char* argv[]) {
     cisg::net::HttpListener http_server(port);
 
     // Handler: GET /health
-    http_server.register_handler("GET", "/health", [&ecu_busy, &ecu_run_id, &ecu_result, &ecu_mutex, domain_id](const cisg::net::HttpRequest&) {
+    http_server.register_handler("GET", "/health", [&ecu_busy, &ecu_run_id, &ecu_result, &ecu_mutex, &iface_name, domain_id](const cisg::net::HttpRequest&) {
         std::lock_guard<std::mutex> lock(ecu_mutex);
+
+#if defined(__linux__) || defined(__unix__)
+        if (global_can_sock < 0) {
+            std::string bound_if = "";
+            global_can_sock = open_socketcan_raw(iface_name, domain_id, bound_if);
+            if (global_can_sock >= 0) {
+                std::cout << "[+] ECU domain " << domain_id << " bound SocketCAN: " << bound_if << " (fd=" << global_can_sock << ") [PASS]\n";
+            }
+        }
+#endif
+
         std::ostringstream ss;
         ss << "{\n";
         ss << "  \"status\": \"ready\",\n";
@@ -391,24 +480,41 @@ int main(int argc, char* argv[]) {
 
         // Run authentic signing, transmission, and pacing in background thread
         std::thread([&ecu_busy, &ecu_result, &ecu_mutex, &mldsa_engine, &sk, test_key, domain_id, scenario, session_id, run_id, iface_name]() {
-            // 1. Prepare challenge payload (32B challenge + 32B measurement + 4B session_id)
-            std::array<uint8_t, 32> challenge{0};
-            for (size_t i = 0; i < 32; ++i) challenge[i] = static_cast<uint8_t>((session_id + i) & 0xFF);
-            std::array<uint8_t, 32> measurement{0xAA, 0xBB, 0xCC, 0xDD};
+            // 1. Prepare canonical 58-byte transcript per NIST FIPS 204 & Capstone specification
+            std::array<uint8_t, 16> challenge_16B{0};
+            for (size_t i = 0; i < 16; ++i) challenge_16B[i] = static_cast<uint8_t>((session_id + i) & 0xFF);
 
-            std::vector<uint8_t> challenge_payload;
-            challenge_payload.reserve(68);
-            challenge_payload.insert(challenge_payload.end(), challenge.begin(), challenge.end());
-            challenge_payload.insert(challenge_payload.end(), measurement.begin(), measurement.end());
-            challenge_payload.push_back(static_cast<uint8_t>((session_id >> 24) & 0xFF));
-            challenge_payload.push_back(static_cast<uint8_t>((session_id >> 16) & 0xFF));
-            challenge_payload.push_back(static_cast<uint8_t>((session_id >> 8) & 0xFF));
-            challenge_payload.push_back(static_cast<uint8_t>(session_id & 0xFF));
+            std::array<uint8_t, 32> measurement_32B{0};
+            std::string default_meas_hex = "82d9d51653585cc325a42c96bd529bb70914e054f763326ffc839e4b0a683d5a";
+            auto meas_vec = hex_to_bytes(default_meas_hex);
+            if (meas_vec.size() >= 32) {
+                std::memcpy(measurement_32B.data(), meas_vec.data(), 32);
+            }
 
-            // 2. Execute genuine NIST FIPS 204 ML-DSA-44 signature generation (zero dummy loops)
+            std::vector<uint8_t> canonical_transcript(58);
+            // Bytes 0-1: Protocol version (0x0001)
+            canonical_transcript[0] = 0x00;
+            canonical_transcript[1] = 0x01;
+            // Bytes 2-5: ECU ID (big-endian 32-bit: 0x1F + domain_id)
+            uint32_t ecu_id = 0x1F + domain_id;
+            canonical_transcript[2] = (ecu_id >> 24) & 0xFF;
+            canonical_transcript[3] = (ecu_id >> 16) & 0xFF;
+            canonical_transcript[4] = (ecu_id >> 8)  & 0xFF;
+            canonical_transcript[5] = ecu_id & 0xFF;
+            // Bytes 6-9: Session ID (big-endian 32-bit)
+            canonical_transcript[6] = (session_id >> 24) & 0xFF;
+            canonical_transcript[7] = (session_id >> 16) & 0xFF;
+            canonical_transcript[8] = (session_id >> 8)  & 0xFF;
+            canonical_transcript[9] = session_id & 0xFF;
+            // Bytes 10-25: 16-byte challenge
+            std::memcpy(&canonical_transcript[10], challenge_16B.data(), 16);
+            // Bytes 26-57: 32-byte measurement hash
+            std::memcpy(&canonical_transcript[26], measurement_32B.data(), 32);
+
+            // 2. Execute genuine NIST FIPS 204 ML-DSA-44 signature generation
             cisg::pqc::Signature sig{};
             size_t sig_len = 0;
-            mldsa_engine.sign(challenge_payload.data(), challenge_payload.size(), sk, sig, sig_len);
+            mldsa_engine.sign(canonical_transcript.data(), canonical_transcript.size(), sk, sig, sig_len);
 
             // 3. Encapsulate into 2,436B PAO buffer with 16B Ascon tag
             std::array<uint8_t, 2436> pao{};
@@ -440,7 +546,7 @@ int main(int argc, char* argv[]) {
             can_fd = get_or_open_can_socket(global_can_sock, iface_name, domain_id, bound_iface);
 #endif
 
-            // 6. Live Transmission & ISO 11898-1 Wire Pacing Loop
+            // 6. Live Transmission & ISO 11898-1 Wire Pacing Loop (Round 0)
             double single_frame_us = cisg::timing::CANFDWireModel::calculate_frame_duration_us(64, false);
             for (int i = 0; i < 41; ++i) {
 #if defined(__linux__) || defined(__unix__)
@@ -474,15 +580,148 @@ int main(int argc, char* argv[]) {
                 cisg::timing::CANFDWireModel::inject_wire_delay(single_frame_us);
             }
 
+            // 7. Listen for Selective NACK (CAN ID 0x201) and Retransmit Missing Frames
+            int nack_rounds_count = 0;
+            int last_round = 0;
+            bool session_activated = false;
+
+#if defined(__linux__) || defined(__unix__)
+            if (can_fd >= 0) {
+                struct pollfd pfd{};
+                pfd.fd = can_fd;
+                pfd.events = POLLIN;
+
+                auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(60);
+                while (std::chrono::steady_clock::now() < deadline) {
+                    auto now_sc = std::chrono::steady_clock::now();
+                    int remaining_ms = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now_sc).count();
+                    if (remaining_ms <= 0) break;
+
+                    int p_ret = poll(&pfd, 1, std::min(remaining_ms, 5));
+                    if (p_ret <= 0) continue;
+
+                    struct canfd_frame in_frame{};
+                    ssize_t nbytes = read(can_fd, &in_frame, sizeof(in_frame));
+                    if (nbytes <= 0) break;
+
+                    if (in_frame.can_id == 0x203) {
+                        // Key delivery frame received! Handshake succeeded!
+                        if (in_frame.len == 64 && in_frame.data[1] == 0xFF && in_frame.data[2] == domain_id) {
+                            session_activated = true;
+                            break;
+                        }
+                    } else if (in_frame.can_id == 0x201) {
+                        // Selective NACK frame received from gateway
+                        if (in_frame.len >= 16 && in_frame.data[0] == 0x13 && in_frame.data[1] == static_cast<uint8_t>(0x1F + domain_id)) {
+                            uint8_t nack_round = in_frame.data[2];
+                            uint32_t sid = (static_cast<uint32_t>(in_frame.data[4]) << 24) |
+                                           (static_cast<uint32_t>(in_frame.data[5]) << 16) |
+                                           (static_cast<uint32_t>(in_frame.data[6]) << 8)  |
+                                           static_cast<uint32_t>(in_frame.data[7]);
+
+                            if (sid == session_id && nack_round > last_round && nack_round <= 3) {
+                                uint64_t missing_bitmap = 0;
+                                for (int b = 0; b < 8; ++b) {
+                                    missing_bitmap = (missing_bitmap << 8) | in_frame.data[8 + b];
+                                }
+
+                                if (missing_bitmap != 0 && (missing_bitmap >> 41) == 0) {
+                                    last_round = nack_round;
+                                    nack_rounds_count = nack_round;
+
+                                    // Retransmit frames requested in missing_bitmap
+                                    for (int i = 0; i < 41; ++i) {
+                                        if (missing_bitmap & (1ULL << i)) {
+                                            struct canfd_frame cf{};
+                                            cf.can_id = cisg::protocol::BlockTransferConstants::CAN_ID_ATTESTATION_BURST; // 0x200
+                                            cf.len = 64;
+                                            cf.flags = CANFD_BRS;
+                                            std::memcpy(cf.data, frames[i].data(), 64);
+                                            write(can_fd, &cf, sizeof(struct canfd_frame));
+
+                                            cisg::net::VirtualCANBus::get_instance().publish(
+                                                domain_id,
+                                                cisg::protocol::BlockTransferConstants::CAN_ID_ATTESTATION_BURST,
+                                                frames[i].data(),
+                                                64
+                                            );
+
+                                            int64_t now_monotonic = get_monotonic_ns();
+                                            int64_t now_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                                std::chrono::system_clock::now().time_since_epoch()).count();
+                                            log_tx_event(run_id, domain_id, bound_iface,
+                                                         static_cast<uint8_t>(i), 41, nack_round, frames[i].data(), 64,
+                                                         now_monotonic, now_epoch);
+
+                                            cisg::timing::CANFDWireModel::inject_wire_delay(single_frame_us);
+                                        }
+                                    }
+                                    // Reset deadline for another 60ms to wait for subsequent NACK or KEY
+                                    deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(60);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+#endif
+
             int64_t terminal_ns = get_monotonic_ns();
             std::string ecu_status = (scenario == "nack_drop") ? "ERR_TIMEOUT_NACK_WAIT" : "SUCCESS";
 
-            // 7. Build ECU Result JSON
+#if defined(__linux__) || defined(__unix__)
+            if (ecu_status == "SUCCESS" && can_fd >= 0) {
+                // Category 1 Diagnostic Frame (CAN ID 0x300) per Phase 1 / DockerLab contract
+                uint8_t diag_buf[64]{};
+                diag_buf[0] = 0x1F;
+                diag_buf[1] = static_cast<uint8_t>(0x1F + domain_id);
+                diag_buf[2] = static_cast<uint8_t>(domain_id);
+                diag_buf[3] = 0x40; // Encrypted flag
+                diag_buf[4] = 0x00;
+                diag_buf[5] = 0x00;
+                diag_buf[6] = 0x00;
+                diag_buf[7] = 0x01; // counter = 1
+
+                uint8_t plaintext[40]{};
+                std::memcpy(plaintext, measurement_32B.data(), 32);
+                int64_t now_mono = get_monotonic_ns();
+                for (int b = 0; b < 8; ++b) {
+                    plaintext[32 + b] = static_cast<uint8_t>((now_mono >> (56 - 8 * b)) & 0xFF);
+                }
+
+                uint8_t nonce[16]{};
+                uint16_t ecu_id16 = static_cast<uint16_t>(0x1F + domain_id);
+                nonce[0] = static_cast<uint8_t>((ecu_id16 >> 8) & 0xFF);
+                nonce[1] = static_cast<uint8_t>(ecu_id16 & 0xFF);
+                nonce[2] = static_cast<uint8_t>(domain_id);
+                nonce[3] = 0x00;
+                nonce[12] = 0x00;
+                nonce[13] = 0x00;
+                nonce[14] = 0x00;
+                nonce[15] = 0x01;
+
+                uint8_t ct[40]{};
+                uint8_t tag[16]{};
+                cisg::crypto::AsconSP800232::encrypt(test_key.data(), nonce, diag_buf, 8, plaintext, 40, ct, tag);
+                std::memcpy(diag_buf + 8, ct, 40);
+                std::memcpy(diag_buf + 48, tag, 16);
+
+                struct canfd_frame df{};
+                df.can_id = 0x300;
+                df.len = 64;
+                df.flags = CANFD_BRS;
+                std::memcpy(df.data, diag_buf, 64);
+                ssize_t nd = write(can_fd, &df, sizeof(df));
+                (void)nd;
+            }
+#endif
+
+            // 8. Build ECU Result JSON
             std::ostringstream ss;
             ss << "{\n";
             ss << "  \"status\": \"" << ecu_status << "\",\n";
             ss << "  \"terminal_ns\": " << terminal_ns << ",\n";
-            ss << "  \"nack_rounds\": 0\n";
+            ss << "  \"nack_rounds\": " << nack_rounds_count << "\n";
             ss << "}";
 
             {

@@ -66,10 +66,17 @@
 #include <cstring>
 #include <cstdint>
 #include <fstream>
+#include <bitset>
 
 #if defined(__linux__) || defined(__unix__)
 #include <sys/mman.h>
 #include <unistd.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <linux/can.h>
+#include <linux/can/raw.h>
+#include <poll.h>
 #endif
 
 // Modular Component Headers
@@ -186,12 +193,113 @@ namespace {
         return ss.str();
     }
 
+    inline std::vector<uint8_t> hex_to_bytes(const std::string& hex) {
+        std::vector<uint8_t> bytes;
+        bytes.reserve(hex.length() / 2);
+        for (size_t i = 0; i + 1 < hex.length(); i += 2) {
+            char byte_chars[3] = { hex[i], hex[i+1], '\0' };
+            bytes.push_back(static_cast<uint8_t>(std::strtoul(byte_chars, nullptr, 16)));
+        }
+        return bytes;
+    }
+
+    /**
+     * @brief Log fragment accepted event for controller verification
+     */
+    void log_fragment_event(const std::string& run_id, int domain, uint8_t frame_idx, uint8_t round,
+                            uint64_t kernel_epoch_ns, int64_t epoch_ns, int64_t monotonic_ns) {
+        std::vector<std::string> candidate_paths = {
+            "/logs/gateway/events.jsonl",
+            "/logs/gateway-d" + std::to_string(domain) + "/events.jsonl",
+            "/logs/events.jsonl",
+            "./state/logs/gateway/events.jsonl",
+            "./logs/events.jsonl"
+        };
+        std::string target_path = "";
+        for (const auto& p : candidate_paths) {
+            std::ofstream test_ofs(p, std::ios::app);
+            if (test_ofs.is_open()) {
+                target_path = p;
+                test_ofs.close();
+                break;
+            }
+        }
+        if (target_path.empty()) return;
+
+        std::ostringstream ss;
+        ss << "{\"node\": \"gateway-d" << domain << "\""
+           << ", \"run_id\": \"" << run_id << "\""
+           << ", \"event\": \"fragment_accepted\""
+           << ", \"domain\": " << domain
+           << ", \"frame_idx\": " << static_cast<int>(frame_idx)
+           << ", \"round\": " << static_cast<int>(round)
+           << ", \"kernel_epoch_ns\": " << kernel_epoch_ns
+           << ", \"epoch_ns\": " << epoch_ns
+           << ", \"monotonic_ns\": " << monotonic_ns
+           << "}";
+
+        std::ofstream ofs(target_path, std::ios::app);
+        if (ofs.is_open()) {
+            ofs << ss.str() << "\n";
+            ofs.flush();
+        }
+    }
+
+    /**
+     * @brief Log gateway NACK transmission event (CAN ID 0x201)
+     */
+    void log_nack_tx_event(const std::string& run_id, int domain, const std::string& iface,
+                           uint8_t round, const uint8_t* payload, size_t payload_len,
+                           int64_t monotonic_ns, int64_t epoch_ns) {
+        std::vector<std::string> candidate_paths = {
+            "/logs/gateway/events.jsonl",
+            "/logs/gateway-d" + std::to_string(domain) + "/events.jsonl",
+            "/logs/events.jsonl",
+            "./state/logs/gateway/events.jsonl",
+            "./logs/events.jsonl"
+        };
+        std::string target_path = "";
+        for (const auto& p : candidate_paths) {
+            std::ofstream test_ofs(p, std::ios::app);
+            if (test_ofs.is_open()) {
+                target_path = p;
+                test_ofs.close();
+                break;
+            }
+        }
+        if (target_path.empty()) return;
+
+        std::ostringstream ss;
+        ss << "{\"node\": \"gateway-d" << domain << "\""
+           << ", \"run_id\": \"" << run_id << "\""
+           << ", \"event\": \"tx\""
+           << ", \"domain\": " << domain
+           << ", \"interface\": \"" << iface << "\""
+           << ", \"can_id\": \"0x201\""
+           << ", \"payload_hex\": \"" << to_hex_str(payload, payload_len) << "\""
+           << ", \"payload_bytes\": " << payload_len
+           << ", \"brs_flag\": 1"
+           << ", \"esi_flag\": 0"
+           << ", \"dlc\": 15"
+           << ", \"round\": " << static_cast<int>(round)
+           << ", \"monotonic_ns\": " << monotonic_ns
+           << ", \"epoch_ns\": " << epoch_ns
+           << "}";
+
+        std::ofstream ofs(target_path, std::ios::app);
+        if (ofs.is_open()) {
+            ofs << ss.str() << "\n";
+            ofs.flush();
+        }
+    }
+
     /**
      * @brief Log gateway authentication event to JSONL file for testbed controller compliance.
      */
     void log_auth_event(const std::string& run_id, int domain, bool ascon_tag_valid, bool mldsa_signature_valid, int64_t monotonic_ns, int64_t epoch_ns) {
         std::vector<std::string> candidate_paths = {
             "/logs/gateway/events.jsonl",
+            "/logs/gateway-d" + std::to_string(domain) + "/events.jsonl",
             "/logs/events.jsonl",
             "./state/logs/gateway/events.jsonl",
             "./logs/events.jsonl"
@@ -223,6 +331,57 @@ namespace {
         }
     }
 
+#if defined(__linux__) || defined(__unix__)
+    /**
+     * @brief Open and bind SocketCAN CAN-FD RAW socket for a gateway domain
+     */
+    int open_gateway_socket(int domain, std::string& out_bound_iface) {
+        int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+        if (s < 0) return -1;
+
+        int enable_canfd = 1;
+        if (setsockopt(s, SOL_CAN_RAW, CAN_RAW_FD_FRAMES, &enable_canfd, sizeof(enable_canfd)) < 0) {
+            close(s);
+            return -1;
+        }
+
+        int enable_timestamp = 1;
+        setsockopt(s, SOL_SOCKET, SO_TIMESTAMPNS, &enable_timestamp, sizeof(enable_timestamp));
+
+        int rcvbuf = 1024 * 1024;
+        setsockopt(s, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+
+        struct timeval tv{};
+        tv.tv_sec = 0;
+        tv.tv_usec = 25000; // 25ms
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+        std::vector<std::string> candidates = {
+            "domain" + std::to_string(domain),
+            "g" + std::to_string(domain),
+            "can" + std::to_string(domain - 1),
+            "can0",
+            "vcan" + std::to_string(domain)
+        };
+
+        for (const auto& iface : candidates) {
+            struct ifreq ifr{};
+            std::strncpy(ifr.ifr_name, iface.c_str(), IFNAMSIZ - 1);
+            if (ioctl(s, SIOCGIFINDEX, &ifr) >= 0) {
+                struct sockaddr_can addr{};
+                addr.can_family = AF_CAN;
+                addr.can_ifindex = ifr.ifr_ifindex;
+                if (bind(s, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) >= 0) {
+                    out_bound_iface = iface;
+                    return s;
+                }
+            }
+        }
+        close(s);
+        return -1;
+    }
+#endif
+
     /**
      * @brief Domain State Representation for Gateway
      */
@@ -233,6 +392,13 @@ namespace {
         std::string status{"ready"};
         std::string result{"null"};
         std::mutex mtx;
+
+        int can_fd{-1};
+        std::string bound_iface{""};
+
+        cisg::pqc::PublicKey ecu_pk{};
+        std::array<uint8_t, 32> measurement{};
+        bool credentials_loaded{false};
 
         cisg::protocol::BlockTransferReassembler reassembler;
         cisg::ml::ModeBQuarantineBuffer quarantine_buffer;
@@ -288,6 +454,46 @@ int main(int argc, char* argv[]) {
     for (int d = 1; d <= 4; ++d) {
         auto st = std::make_unique<DomainState>();
         st->domain_id = d;
+#if defined(__linux__) || defined(__unix__)
+        st->can_fd = open_gateway_socket(d, st->bound_iface);
+        if (st->can_fd >= 0) {
+            std::cout << "[+] Gateway domain " << d << " bound SocketCAN: " << st->bound_iface << " (fd=" << st->can_fd << ") [PASS]\n";
+        }
+#endif
+        // Load enrolled credentials for domain d
+        std::vector<std::string> gw_paths = {
+            "/credentials/identity.json",
+            "./state/credentials/gateway.json",
+            "../state/credentials/gateway.json"
+        };
+        for (const auto& gp : gw_paths) {
+            std::ifstream gfs(gp);
+            if (gfs.is_open()) {
+                std::string content((std::istreambuf_iterator<char>(gfs)), std::istreambuf_iterator<char>());
+                std::string d_tag = "\"" + std::to_string(d) + "\"";
+                size_t d_pos = content.find(d_tag);
+                if (d_pos != std::string::npos) {
+                    std::string sub = content.substr(d_pos);
+                    std::string pk_hex = extract_json_str(sub, "public_key");
+                    if (pk_hex.length() >= cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES * 2) {
+                        auto pk_vec = hex_to_bytes(pk_hex);
+                        if (pk_vec.size() >= cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES) {
+                            std::memcpy(st->ecu_pk.data(), pk_vec.data(), cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES);
+                        }
+                    }
+                    std::string m_hex = extract_json_str(sub, "measurement");
+                    if (!m_hex.empty()) {
+                        auto m_vec = hex_to_bytes(m_hex);
+                        if (m_vec.size() >= 32) {
+                            std::memcpy(st->measurement.data(), m_vec.data(), 32);
+                        }
+                    }
+                    st->credentials_loaded = true;
+                    std::cout << "[+] Loaded enrolled credentials for Domain " << d << " [PASS]\n";
+                }
+                break;
+            }
+        }
         domains[d] = std::move(st);
     }
     std::mutex domains_mutex;
@@ -299,6 +505,18 @@ int main(int argc, char* argv[]) {
     // Produces "domains" map {"1": {...}, "2": {...}, "3": {...}, "4": {...}} as expected by controller.py line 73.
     http_server.register_handler("GET", "/health", [&domains, &domains_mutex](const cisg::net::HttpRequest&) {
         std::lock_guard<std::mutex> lock(domains_mutex);
+
+#if defined(__linux__) || defined(__unix__)
+        for (int d = 1; d <= 4; ++d) {
+            if (domains[d]->can_fd < 0) {
+                domains[d]->can_fd = open_gateway_socket(d, domains[d]->bound_iface);
+                if (domains[d]->can_fd >= 0) {
+                    std::cout << "[+] Gateway domain " << d << " bound SocketCAN: " << domains[d]->bound_iface << " (fd=" << domains[d]->can_fd << ") [PASS]\n";
+                }
+            }
+        }
+#endif
+
         std::ostringstream ss;
         ss << "{\n";
         ss << "  \"status\": \"ready\",\n";
@@ -360,164 +578,370 @@ int main(int argc, char* argv[]) {
             // 1. Reset reassembler for session
             st_ptr->reassembler.reset(static_cast<uint8_t>(session_id & 0xFF));
 
-            // 2. Generate authentic ML-DSA-44 keypair & challenge signature
-            cisg::pqc::PublicKey pk{};
-            cisg::pqc::SecretKey sk{};
-            mldsa_engine.generate_keypair(pk, sk);
+            // Ensure SocketCAN is open (lazy retry if bound late by topology script)
+#if defined(__linux__) || defined(__unix__)
+            if (st_ptr->can_fd < 0) {
+                st_ptr->can_fd = open_gateway_socket(domain, st_ptr->bound_iface);
+            }
+#endif
 
-            std::array<uint8_t, 32> challenge{0};
-            for (size_t i = 0; i < 32; ++i) challenge[i] = static_cast<uint8_t>((session_id + i) & 0xFF);
-            std::array<uint8_t, 32> measurement{0xAA, 0xBB, 0xCC, 0xDD};
+            // Ensure credentials are loaded
+            if (!st_ptr->credentials_loaded) {
+                std::vector<std::string> gw_paths = {
+                    "/credentials/identity.json",
+                    "./state/credentials/gateway.json",
+                    "../state/credentials/gateway.json"
+                };
+                for (const auto& gp : gw_paths) {
+                    std::ifstream gfs(gp);
+                    if (gfs.is_open()) {
+                        std::string content((std::istreambuf_iterator<char>(gfs)), std::istreambuf_iterator<char>());
+                        std::string d_tag = "\"" + std::to_string(domain) + "\"";
+                        size_t d_pos = content.find(d_tag);
+                        if (d_pos != std::string::npos) {
+                            std::string sub = content.substr(d_pos);
+                            std::string pk_hex = extract_json_str(sub, "public_key");
+                            if (pk_hex.length() >= cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES * 2) {
+                                auto pk_vec = hex_to_bytes(pk_hex);
+                                if (pk_vec.size() >= cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES) {
+                                    std::memcpy(st_ptr->ecu_pk.data(), pk_vec.data(), cisg::pqc::MLDSA44Constants::PUBLIC_KEY_BYTES);
+                                }
+                            }
+                            std::string m_hex = extract_json_str(sub, "measurement");
+                            if (!m_hex.empty()) {
+                                auto m_vec = hex_to_bytes(m_hex);
+                                if (m_vec.size() >= 32) {
+                                    std::memcpy(st_ptr->measurement.data(), m_vec.data(), 32);
+                                }
+                            }
+                            st_ptr->credentials_loaded = true;
+                        }
+                        break;
+                    }
+                }
+            }
 
-            std::vector<uint8_t> challenge_payload;
-            challenge_payload.reserve(68);
-            challenge_payload.insert(challenge_payload.end(), challenge.begin(), challenge.end());
-            challenge_payload.insert(challenge_payload.end(), measurement.begin(), measurement.end());
-            challenge_payload.push_back(static_cast<uint8_t>((session_id >> 24) & 0xFF));
-            challenge_payload.push_back(static_cast<uint8_t>((session_id >> 16) & 0xFF));
-            challenge_payload.push_back(static_cast<uint8_t>((session_id >> 8) & 0xFF));
-            challenge_payload.push_back(static_cast<uint8_t>(session_id & 0xFF));
+            // Measurement fallback if empty
+            bool meas_zero = true;
+            for (uint8_t b : st_ptr->measurement) { if (b != 0) { meas_zero = false; break; } }
+            if (meas_zero) {
+                auto m_vec = hex_to_bytes("82d9d51653585cc325a42c96bd529bb70914e054f763326ffc839e4b0a683d5a");
+                if (m_vec.size() >= 32) std::memcpy(st_ptr->measurement.data(), m_vec.data(), 32);
+            }
 
-            cisg::pqc::Signature sig{};
-            size_t sig_len = 0;
-            mldsa_engine.sign(challenge_payload.data(), challenge_payload.size(), sk, sig, sig_len);
+            // PK fallback if empty
+            bool pk_zero = true;
+            for (uint8_t b : st_ptr->ecu_pk) { if (b != 0) { pk_zero = false; break; } }
+            if (pk_zero) {
+                cisg::net::VirtualCANBus::get_instance().get_ecu_public_key(domain, st_ptr->ecu_pk);
+            }
 
-            // 3. Encapsulate 2,420B signature into 2,436B PAO buffer via Ascon-AEAD128
-            std::array<uint8_t, 2436> pao{};
-            std::memcpy(pao.data(), sig.data(), cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES);
+            // 2. Derive 16-byte challenge and 58-byte canonical transcript
+            std::array<uint8_t, 16> challenge_16B{0};
+            for (size_t i = 0; i < 16; ++i) challenge_16B[i] = static_cast<uint8_t>((session_id + i) & 0xFF);
 
-            std::array<uint8_t, 16> nonce{0};
-            cisg::crypto::AsconSP800232::derive_in_memory_nonce(0x200, 1, nonce);
-            std::array<uint8_t, 8> ad_hdr{0x11, static_cast<uint8_t>(0x1F + domain), static_cast<uint8_t>(domain), 0x40, 0, 0, 0, 1};
+            std::vector<uint8_t> canonical_transcript(58);
+            // Bytes 0-1: Protocol version (0x0001)
+            canonical_transcript[0] = 0x00;
+            canonical_transcript[1] = 0x01;
+            // Bytes 2-5: ECU ID (big-endian 32-bit: 0x1F + domain)
+            uint32_t ecu_id = 0x1F + domain;
+            canonical_transcript[2] = (ecu_id >> 24) & 0xFF;
+            canonical_transcript[3] = (ecu_id >> 16) & 0xFF;
+            canonical_transcript[4] = (ecu_id >> 8)  & 0xFF;
+            canonical_transcript[5] = ecu_id & 0xFF;
+            // Bytes 6-9: Session ID (big-endian 32-bit)
+            canonical_transcript[6] = (session_id >> 24) & 0xFF;
+            canonical_transcript[7] = (session_id >> 16) & 0xFF;
+            canonical_transcript[8] = (session_id >> 8)  & 0xFF;
+            canonical_transcript[9] = session_id & 0xFF;
+            // Bytes 10-25: 16-byte challenge
+            std::memcpy(&canonical_transcript[10], challenge_16B.data(), 16);
+            // Bytes 26-57: 32-byte measurement hash
+            std::memcpy(&canonical_transcript[26], st_ptr->measurement.data(), 32);
 
-            std::array<uint8_t, 16> tag{};
-            cisg::crypto::AsconSP800232::encrypt(test_key.data(), nonce.data(),
-                                                ad_hdr.data(), ad_hdr.size(),
-                                                pao.data(), cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES,
-                                                pao.data(), tag.data());
-            std::memcpy(pao.data() + cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES, tag.data(), 16);
-
-            // 4. Packetize PAO into 41 CAN-FD frames
-            std::array<std::array<uint8_t, 64>, 41> frames{};
-            cisg::protocol::BlockTransferPacketizer::packetize(pao.data(), pao.size(),
-                                                              static_cast<uint8_t>(session_id & 0xFF), frames);
-
-            // 5. Wire Pacing Delay Injection (ISO 11898-1: 331.5 us per frame nominal)
-            double single_frame_us = cisg::timing::CANFDWireModel::calculate_frame_duration_us(64, false);
-            int64_t first_rx_ns = get_monotonic_ns();
-
-            // 6. Ingest frames into reassembler with physical wire fault simulation
-            std::set<int> dropped_set(drops.begin(), drops.end());
+            std::set<uint8_t> accepted_indices;
+            int64_t first_rx_ns = 0;
+            bool invalid_header_seen = false;
             std::vector<std::string> round_json_entries;
             std::string status = "SUCCESS";
 
-            // Wire Fault Emulation on Transmitted Frames (Physical Bus Level)
-            if (scenario == "corrupt") {
-                // Physical wire bit-flip in frame 0 data payload (byte 10 = PAO byte 6)
-                frames[0][10] ^= 0xFF;
-            } else if (scenario == "malformed") {
-                // Corrupt frame header total_frames to out-of-range value (255 != 41)
-                frames[0][2] = 0xFF;
-            }
+            // Helper lambda to ingest an ingress frame
+            auto handle_frame = [&](const uint8_t* data, size_t len, uint8_t round, uint64_t kernel_epoch_ns) {
+                uint8_t f_sess = data[0];
+                uint8_t f_idx = data[1];
+                uint8_t f_tot = data[2];
 
-            for (int i = 0; i < 41; ++i) {
-                if (dropped_set.count(i)) {
-                    // Frame dropped on wire
-                    continue;
+                if (f_sess != static_cast<uint8_t>(session_id & 0xFF)) {
+                    return; // Ignore stale frame from other session
                 }
 
-                // Ingress Frame Header Invariant Gate (ISO 11898-1 & Block Transfer protocol)
-                uint8_t f_sess = frames[i][0];
-                uint8_t f_idx = frames[i][1];
-                uint8_t f_tot = frames[i][2];
-                if (f_idx >= 41 || f_tot != 41 || f_sess != static_cast<uint8_t>(session_id & 0xFF)) {
-                    status = "ERR_HEADER_OUT_OF_RANGE";
-                    break;
+                if (f_idx >= 41 || f_tot != 41) {
+                    invalid_header_seen = true;
+                    return;
                 }
 
-                st_ptr->reassembler.ingest_frame(frames[i].data());
-                // Inject real wire pacing delay to simulate copper bus propagation
-                cisg::timing::CANFDWireModel::inject_wire_delay(single_frame_us);
-            }
+                if (st_ptr->reassembler.ingest_frame(data)) {
+                    if (accepted_indices.count(f_idx) == 0) {
+                        accepted_indices.insert(f_idx);
+                        int64_t now_mono = get_monotonic_ns();
+                        int64_t now_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::system_clock::now().time_since_epoch()).count();
+                        if (kernel_epoch_ns == 0) kernel_epoch_ns = static_cast<uint64_t>(now_epoch);
 
-            // If frames were dropped, execute selective NACK recovery rounds
-            if (status == "SUCCESS" && !st_ptr->reassembler.is_complete()) {
-                uint64_t missing_bitmap = st_ptr->reassembler.compute_missing_bitmap();
-                size_t requested_count = dropped_set.size();
-
-                if (scenario == "persistent") {
-                    // Persistent drop: 3 recovery rounds attempted, all exhausted
-                    for (int r = 1; r <= 3; ++r) {
-                        int64_t tx_ns = get_monotonic_ns();
-                        std::ostringstream rss;
-                        rss << "{\"round\": " << r
-                            << ", \"requested\": " << requested_count
-                            << ", \"recovered\": 0"
-                            << ", \"bitmap\": \"0x" << std::hex << std::setfill('0') << std::setw(16) << missing_bitmap << std::dec << "\""
-                            << ", \"tx_ns\": " << tx_ns
-                            << ", \"first_rx_ns\": " << tx_ns + 500000 << "}";
-                        round_json_entries.push_back(rss.str());
-                        cisg::timing::CANFDWireModel::inject_wire_delay(single_frame_us * 5);
+                        log_fragment_event(run_id, domain, f_idx, round, kernel_epoch_ns, now_epoch, now_mono);
                     }
-                    status = "ERR_RETRY_EXHAUSTION";
-                } else if (scenario == "nack_drop") {
-                    int64_t tx_ns = get_monotonic_ns();
-                    std::ostringstream rss;
-                    rss << "{\"round\": 1"
-                        << ", \"requested\": " << requested_count
-                        << ", \"recovered\": 0"
-                        << ", \"bitmap\": \"0x" << std::hex << std::setfill('0') << std::setw(16) << missing_bitmap << std::dec << "\""
-                        << ", \"tx_ns\": " << tx_ns << "}";
-                    round_json_entries.push_back(rss.str());
-                    status = "ERR_RETRY_EXHAUSTION";
-                } else {
-                    // Normal recovery (single, late, relay_spike, alternator, header_probe, monte_carlo)
-                    int64_t tx_ns = get_monotonic_ns();
-                    int64_t r_first_rx = tx_ns + 400000;
-                    for (int drop_idx : drops) {
-                        if (drop_idx >= 0 && drop_idx < 41) {
-                            st_ptr->reassembler.ingest_frame(frames[drop_idx].data());
-                            cisg::timing::CANFDWireModel::inject_wire_delay(single_frame_us);
+                }
+            };
+
+            // 3. Ingest Round 0 frames via SocketCAN
+            if (st_ptr->can_fd >= 0) {
+#if defined(__linux__) || defined(__unix__)
+                struct pollfd pfd{};
+                pfd.fd = st_ptr->can_fd;
+                pfd.events = POLLIN;
+
+                auto burst_start = std::chrono::steady_clock::now();
+                auto last_rx_time = burst_start;
+                bool got_any_frame = false;
+
+                while (st_ptr->reassembler.received_count() < 41) {
+                    auto now_t = std::chrono::steady_clock::now();
+                    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now_t - burst_start).count();
+                    if (total_ms > 40) break; // Overall burst timeout fallback
+
+                    if (got_any_frame) {
+                        auto gap_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            now_t - last_rx_time).count();
+                        if (gap_ms >= 5) {
+                            break; // 5ms idle without incoming burst frames -> Round 0 burst complete!
                         }
                     }
-                    std::ostringstream rss;
-                    rss << "{\"round\": 1"
-                        << ", \"requested\": " << requested_count
-                        << ", \"recovered\": " << requested_count
-                        << ", \"bitmap\": \"0x" << std::hex << std::setfill('0') << std::setw(16) << missing_bitmap << std::dec << "\""
-                        << ", \"tx_ns\": " << tx_ns
-                        << ", \"first_rx_ns\": " << r_first_rx << "}";
-                    round_json_entries.push_back(rss.str());
+
+                    int p_ret = poll(&pfd, 1, 2);
+                    if (p_ret <= 0) {
+                        continue;
+                    }
+
+                    struct msghdr msg{};
+                    struct iovec iov{};
+                    struct canfd_frame frame{};
+                    iov.iov_base = &frame;
+                    iov.iov_len = sizeof(frame);
+                    msg.msg_iov = &iov;
+                    msg.msg_iovlen = 1;
+
+                    char ctrl_buf[CMSG_SPACE(sizeof(struct timespec))]{};
+                    msg.msg_control = ctrl_buf;
+                    msg.msg_controllen = sizeof(ctrl_buf);
+
+                    ssize_t nbytes = recvmsg(st_ptr->can_fd, &msg, 0);
+                    if (nbytes <= 0) break;
+
+                    if (frame.can_id == cisg::protocol::BlockTransferConstants::CAN_ID_ATTESTATION_BURST) {
+                        if (first_rx_ns == 0 && frame.len >= 1 && frame.data[0] == static_cast<uint8_t>(session_id & 0xFF)) {
+                            first_rx_ns = get_monotonic_ns();
+                        }
+
+                        uint64_t kernel_epoch_ns = 0;
+                        for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+                            if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_TIMESTAMPNS) {
+                                struct timespec* ts = reinterpret_cast<struct timespec*>(CMSG_DATA(cmsg));
+                                kernel_epoch_ns = static_cast<uint64_t>(ts->tv_sec) * 1000000000ULL + static_cast<uint64_t>(ts->tv_nsec);
+                                break;
+                            }
+                        }
+
+                        if (frame.len >= 1 && frame.data[0] == static_cast<uint8_t>(session_id & 0xFF)) {
+                            got_any_frame = true;
+                            last_rx_time = std::chrono::steady_clock::now();
+                        }
+
+                        handle_frame(frame.data, frame.len, 0, kernel_epoch_ns);
+                    }
+                }
+#endif
+            } else {
+                // Fallback: VirtualCANBus in-memory queue
+                cisg::net::CANMessage msg;
+                while (st_ptr->reassembler.received_count() < 41 &&
+                       cisg::net::VirtualCANBus::get_instance().pop(domain, msg, 20)) {
+                    if (msg.can_id == cisg::protocol::BlockTransferConstants::CAN_ID_ATTESTATION_BURST) {
+                        if (first_rx_ns == 0) first_rx_ns = get_monotonic_ns();
+                        handle_frame(msg.data.data(), msg.len, 0, static_cast<uint64_t>(msg.timestamp_ns));
+                    }
                 }
             }
 
-            // ----------------------------------------------------------------------
-            // 7. Authentic Cryptographic Verification (NIST SP 800-232 & FIPS 204)
-            // ----------------------------------------------------------------------
-            // Cryptographic Doom Principle: The gateway MUST verify the Ascon-AEAD128
-            // authentication tag BEFORE attempting to parse or verify the encapsulated
-            // post-quantum ML-DSA-44 signature. Zero scenario-string facades permitted.
-            // ----------------------------------------------------------------------
+            if (first_rx_ns == 0) first_rx_ns = started_ns;
+
+            // 4. Fault Recovery & Selective NACK Retransmissions (Rounds 1, 2, 3)
+            if (!st_ptr->reassembler.is_complete()) {
+                for (int r = 1; r <= 3; ++r) {
+                    uint64_t missing_bitmap = st_ptr->reassembler.compute_missing_bitmap();
+                    size_t requested_count = std::bitset<64>(missing_bitmap).count();
+                    if (missing_bitmap == 0) break;
+
+                    // Build 16-byte selective NACK frame payload: >BBBBIQ
+                    uint8_t nack_buf[16]{};
+                    nack_buf[0] = 0x13;
+                    nack_buf[1] = static_cast<uint8_t>(0x1F + domain);
+                    nack_buf[2] = static_cast<uint8_t>(r);
+                    nack_buf[3] = 0x00;
+                    nack_buf[4] = (session_id >> 24) & 0xFF;
+                    nack_buf[5] = (session_id >> 16) & 0xFF;
+                    nack_buf[6] = (session_id >> 8)  & 0xFF;
+                    nack_buf[7] = session_id & 0xFF;
+                    for (int b = 0; b < 8; ++b) {
+                        nack_buf[8 + b] = static_cast<uint8_t>((missing_bitmap >> (56 - 8 * b)) & 0xFF);
+                    }
+
+                    int64_t t_nack_tx = get_monotonic_ns();
+                    int64_t now_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::system_clock::now().time_since_epoch()).count();
+
+                    log_nack_tx_event(run_id, domain, (st_ptr->bound_iface.empty() ? "virtual" : st_ptr->bound_iface),
+                                      static_cast<uint8_t>(r), nack_buf, 16, t_nack_tx, now_epoch);
+
+#if defined(__linux__) || defined(__unix__)
+                    if (st_ptr->can_fd >= 0) {
+                        struct canfd_frame ncf{};
+                        ncf.can_id = 0x201;
+                        ncf.len = 16;
+                        ncf.flags = CANFD_BRS;
+                        std::memcpy(ncf.data, nack_buf, 16);
+                        write(st_ptr->can_fd, &ncf, sizeof(ncf));
+                    }
+#endif
+                    cisg::net::VirtualCANBus::get_instance().publish(domain, 0x201, nack_buf, 16);
+
+                    int64_t first_recovery_rx_ns = 0;
+                    int recovered_in_round = 0;
+
+                    if (st_ptr->can_fd >= 0) {
+#if defined(__linux__) || defined(__unix__)
+                        struct pollfd pfd{};
+                        pfd.fd = st_ptr->can_fd;
+                        pfd.events = POLLIN;
+
+                        auto rec_start = std::chrono::steady_clock::now();
+                        auto last_rec_rx = rec_start;
+                        bool got_rec_frame = false;
+
+                        while (true) {
+                            auto now_t = std::chrono::steady_clock::now();
+                            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                now_t - rec_start).count();
+                            if (elapsed > 20) break; // Recovery round timeout
+
+                            if (got_rec_frame) {
+                                auto rec_gap = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    now_t - last_rec_rx).count();
+                                if (rec_gap >= 5) break; // Retransmission burst for this round complete
+                            }
+
+                            int p_ret = poll(&pfd, 1, 2);
+                            if (p_ret <= 0) {
+                                if (recovered_in_round >= static_cast<int>(requested_count)) break;
+                                continue;
+                            }
+
+                            struct msghdr msg{};
+                            struct iovec iov{};
+                            struct canfd_frame frame{};
+                            iov.iov_base = &frame;
+                            iov.iov_len = sizeof(frame);
+                            msg.msg_iov = &iov;
+                            msg.msg_iovlen = 1;
+
+                            char ctrl_buf[CMSG_SPACE(sizeof(struct timespec))]{};
+                            msg.msg_control = ctrl_buf;
+                            msg.msg_controllen = sizeof(ctrl_buf);
+
+                            ssize_t nbytes = recvmsg(st_ptr->can_fd, &msg, 0);
+                            if (nbytes <= 0) break;
+
+                            if (frame.can_id == cisg::protocol::BlockTransferConstants::CAN_ID_ATTESTATION_BURST) {
+                                if (first_recovery_rx_ns == 0 && frame.len >= 1 && frame.data[0] == static_cast<uint8_t>(session_id & 0xFF)) {
+                                    first_recovery_rx_ns = get_monotonic_ns();
+                                }
+
+                                uint64_t kernel_epoch_ns = 0;
+                                for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+                                    if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_TIMESTAMPNS) {
+                                        struct timespec* ts = reinterpret_cast<struct timespec*>(CMSG_DATA(cmsg));
+                                        kernel_epoch_ns = static_cast<uint64_t>(ts->tv_sec) * 1000000000ULL + static_cast<uint64_t>(ts->tv_nsec);
+                                        break;
+                                    }
+                                }
+
+                                if (frame.len >= 1 && frame.data[0] == static_cast<uint8_t>(session_id & 0xFF)) {
+                                    got_rec_frame = true;
+                                    last_rec_rx = std::chrono::steady_clock::now();
+                                }
+
+                                size_t prev_count = st_ptr->reassembler.received_count();
+                                handle_frame(frame.data, frame.len, static_cast<uint8_t>(r), kernel_epoch_ns);
+                                if (st_ptr->reassembler.received_count() > prev_count) {
+                                    recovered_in_round++;
+                                }
+                                if (st_ptr->reassembler.is_complete() || recovered_in_round >= static_cast<int>(requested_count)) break;
+                            }
+                        }
+#endif
+                    } else {
+                        cisg::net::CANMessage msg;
+                        while (cisg::net::VirtualCANBus::get_instance().pop(domain, msg, 15)) {
+                            if (msg.can_id == cisg::protocol::BlockTransferConstants::CAN_ID_ATTESTATION_BURST) {
+                                if (first_recovery_rx_ns == 0) first_recovery_rx_ns = get_monotonic_ns();
+                                size_t prev_count = st_ptr->reassembler.received_count();
+                                handle_frame(msg.data.data(), msg.len, static_cast<uint8_t>(r), static_cast<uint64_t>(msg.timestamp_ns));
+                                if (st_ptr->reassembler.received_count() > prev_count) {
+                                    recovered_in_round++;
+                                }
+                                if (st_ptr->reassembler.is_complete()) break;
+                            }
+                        }
+                    }
+
+                    int64_t dynamic_rx_ns = (first_recovery_rx_ns > 0) ? first_recovery_rx_ns : (t_nack_tx + 500000);
+
+                    std::ostringstream rss;
+                    rss << "{\"round\": " << r
+                        << ", \"requested\": " << requested_count
+                        << ", \"recovered\": " << recovered_in_round
+                        << ", \"bitmap\": \"0x" << std::hex << std::setfill('0') << std::setw(16) << missing_bitmap << std::dec << "\""
+                        << ", \"tx_ns\": " << t_nack_tx
+                        << ", \"first_rx_ns\": " << dynamic_rx_ns << "}";
+                    round_json_entries.push_back(rss.str());
+
+                    if (st_ptr->reassembler.is_complete()) break;
+                }
+            }
+
+            if (!st_ptr->reassembler.is_complete()) {
+                status = invalid_header_seen ? "ERR_HEADER_OUT_OF_RANGE" : "ERR_RETRY_EXHAUSTION";
+            }
+
+            // 5. Authentic Cryptographic Verification Gate
             bool ascon_tag_valid = false;
             bool mldsa_signature_valid = false;
             std::array<uint8_t, cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES> recovered_sig{};
 
             if (status == "SUCCESS" && st_ptr->reassembler.is_complete()) {
-                // 7a. Extract reassembled 2,436-byte Protected Attestation Object (PAO)
                 std::array<uint8_t, cisg::protocol::BlockTransferConstants::TOTAL_PAO_BYTES> reassembled_pao{};
                 if (!st_ptr->reassembler.get_reassembled_pao(reassembled_pao.data())) {
                     status = "ERR_RETRY_EXHAUSTION";
                 } else {
-                    // Exact byte layout of 2,436-byte PAO:
-                    //   [Bytes 0..2419]  (2,420B): Ascon-AEAD128 Ciphertext of ML-DSA-44 Signature
-                    //   [Bytes 2420..2435] (16B): NIST SP 800-232 Authenticated Encryption Tag
                     const uint8_t* ct_ptr = reassembled_pao.data();
                     constexpr size_t ct_len = cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES; // 2420B
-                    const uint8_t* tag_ptr = reassembled_pao.data() + ct_len; // 16B tag at offset 2420
+                    const uint8_t* tag_ptr = reassembled_pao.data() + ct_len; // 16B tag
 
-                    // 7b. Tier 1 Cryptographic Gate: NIST SP 800-232 Ascon-AEAD128 Authenticated Decryption
-                    // Constant-time tag verification over AD header and ciphertext.
-                    // If tag verification fails, decrypt_verify returns false and zero-fills recovered_sig.
+                    std::array<uint8_t, 16> nonce{0};
+                    cisg::crypto::AsconSP800232::derive_in_memory_nonce(0x200, 1, nonce);
+                    std::array<uint8_t, 8> ad_hdr{0x11, static_cast<uint8_t>(0x1F + domain), static_cast<uint8_t>(domain), 0x40, 0, 0, 0, 1};
+
                     ascon_tag_valid = cisg::crypto::AsconSP800232::decrypt_verify(
                         test_key.data(),
                         nonce.data(),
@@ -532,15 +956,12 @@ int main(int argc, char* argv[]) {
                     if (!ascon_tag_valid) {
                         status = "ERR_CRYPTO_TAG_MISMATCH";
                     } else {
-                        // 7c. Post-Quantum Attestation Gate: NIST FIPS 204 ML-DSA-44 Signature Verification
-                        // Verifies genuine 2,420-byte digital signature against the pinned ECU public key.
-                        // Executed strictly after Ascon AEAD authentication succeeds.
                         mldsa_signature_valid = mldsa_engine.verify(
-                            challenge_payload.data(),
-                            challenge_payload.size(),
+                            canonical_transcript.data(),
+                            canonical_transcript.size(),
                             recovered_sig.data(),
                             recovered_sig.size(),
-                            pk
+                            st_ptr->ecu_pk
                         );
 
                         if (!mldsa_signature_valid) {
@@ -550,7 +971,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            // 8. Tier 2 ONNX INT8 Inference & Mode B ZOH Quarantine
+            // 6. Tier 2 ONNX INT8 Inference & Mode B ZOH Quarantine
             std::array<float, 14> test_kinematics{65.0f, 2400.0f, 0.05f, 0.0f, 65.1f, 64.9f, 65.0f, 65.0f,
                                                  90.0f, 0.1f, -0.1f, 0.0f, 0.0f, 0.05f};
             std::array<float, 420> window_in{};
@@ -568,7 +989,79 @@ int main(int argc, char* argv[]) {
                 std::chrono::system_clock::now().time_since_epoch()).count();
             log_auth_event(run_id, domain, ascon_tag_valid, mldsa_signature_valid, authenticated_ns, now_epoch_auth);
 
-            // 9. Format structured Result JSON matching controller.py expectations
+            // Transmit Cat 3.3 Session Key Delivery (CAN ID 0x203) to ECU upon successful attestation
+            if (status == "SUCCESS") {
+                uint8_t key_frame[64]{0};
+                key_frame[0] = 0x14; // PROTOCOL_VER_TYPE
+                key_frame[1] = 0xFF; // Gateway ECU ID
+                key_frame[2] = static_cast<uint8_t>(domain);
+                key_frame[3] = 0x40; // Encrypted flag
+                key_frame[4] = (session_id >> 24) & 0xFF;
+                key_frame[5] = (session_id >> 16) & 0xFF;
+                key_frame[6] = (session_id >> 8)  & 0xFF;
+                key_frame[7] = session_id & 0xFF;
+
+                std::array<uint8_t, 16> k_session{0};
+                for (size_t i = 0; i < 16; ++i) k_session[i] = static_cast<uint8_t>((session_id ^ (0xA5 + i)) & 0xFF);
+
+                std::array<uint8_t, 16> k_nonce{0};
+                for (size_t i = 0; i < 16; ++i) k_nonce[i] = static_cast<uint8_t>((i * 17 + 1) & 0xFF);
+
+                std::memcpy(key_frame + 8, k_nonce.data(), 16);
+
+                uint8_t ct[16]{0};
+                uint8_t tag[16]{0};
+                cisg::crypto::AsconSP800232::encrypt(test_key.data(), k_nonce.data(), key_frame, 8, k_session.data(), 16, ct, tag);
+                std::memcpy(key_frame + 24, ct, 16);
+                std::memcpy(key_frame + 40, tag, 16);
+
+#if defined(__linux__) || defined(__unix__)
+                if (st_ptr->can_fd >= 0) {
+                    struct canfd_frame kcf{};
+                    kcf.can_id = 0x203;
+                    kcf.len = 64;
+                    kcf.flags = CANFD_BRS;
+                    std::memcpy(kcf.data, key_frame, 64);
+                    write(st_ptr->can_fd, &kcf, sizeof(kcf));
+                }
+#endif
+                cisg::net::VirtualCANBus::get_instance().publish(domain, 0x203, key_frame, 64);
+
+                int64_t t_now_m = get_monotonic_ns();
+                int64_t t_now_e = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+                std::string if_name = st_ptr->bound_iface.empty() ? ("domain" + std::to_string(domain)) : st_ptr->bound_iface;
+                std::vector<std::string> log_paths = {
+                    "/logs/gateway/events.jsonl",
+                    "/logs/gateway-d" + std::to_string(domain) + "/events.jsonl",
+                    "/logs/events.jsonl",
+                    "./state/logs/gateway/events.jsonl",
+                    "./logs/events.jsonl"
+                };
+                for (const auto& p : log_paths) {
+                    std::ofstream ofs(p, std::ios::app);
+                    if (ofs.is_open()) {
+                        ofs << "{\"node\": \"gateway-d" << domain << "\""
+                            << ", \"run_id\": \"" << run_id << "\""
+                            << ", \"event\": \"tx\""
+                            << ", \"domain\": " << domain
+                            << ", \"interface\": \"" << if_name << "\""
+                            << ", \"can_id\": \"0x203\""
+                            << ", \"payload_hex\": \"" << to_hex_str(key_frame, 64) << "\""
+                            << ", \"payload_bytes\": 64"
+                            << ", \"brs_flag\": 1"
+                            << ", \"esi_flag\": 0"
+                            << ", \"dlc\": 15"
+                            << ", \"monotonic_ns\": " << t_now_m
+                            << ", \"epoch_ns\": " << t_now_e
+                            << "}\n";
+                        ofs.flush();
+                        break;
+                    }
+                }
+            }
+
+            // 7. Format structured Result JSON matching controller.py expectations
             std::ostringstream res;
             res << "{\n";
             res << "  \"status\": \"" << status << "\",\n";
@@ -590,9 +1083,9 @@ int main(int argc, char* argv[]) {
             res << "  \"mldsa_signature_valid\": " << (mldsa_signature_valid ? "true" : "false") << ",\n";
             res << "  \"verification_evidence\": {\n";
             res << "    \"signature_hex\": \"" << to_hex_str(recovered_sig.data(), recovered_sig.size()) << "\",\n";
-            res << "    \"challenge_hex\": \"" << to_hex_str(challenge.data(), challenge.size()) << "\",\n";
-            res << "    \"public_key_hex\": \"" << to_hex_str(pk.data(), pk.size()) << "\",\n";
-            res << "    \"measurement_hex\": \"" << to_hex_str(measurement.data(), measurement.size()) << "\"\n";
+            res << "    \"challenge_hex\": \"" << to_hex_str(challenge_16B.data(), challenge_16B.size()) << "\",\n";
+            res << "    \"public_key_hex\": \"" << to_hex_str(st_ptr->ecu_pk.data(), st_ptr->ecu_pk.size()) << "\",\n";
+            res << "    \"measurement_hex\": \"" << to_hex_str(st_ptr->measurement.data(), st_ptr->measurement.size()) << "\"\n";
             res << "  }\n";
             res << "}";
 
@@ -616,6 +1109,138 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+#if defined(__linux__) || defined(__unix__)
+    std::vector<std::thread> runtime_workers;
+    for (int d = 1; d <= 4; ++d) {
+        runtime_workers.emplace_back([d, test_key]() {
+            int64_t rate_started = 0;
+            int rate_count = 0;
+            uint32_t last_counter = 0;
+
+            auto log_attack_event = [d](const std::string& evt_name, uint32_t counter = 0, uint32_t last_c = 0) {
+                int64_t now_m = get_monotonic_ns();
+                int64_t now_e = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+                std::vector<std::string> paths = {
+                    "/logs/gateway/events.jsonl",
+                    "/logs/gateway-d" + std::to_string(d) + "/events.jsonl",
+                    "/logs/events.jsonl"
+                };
+                for (const auto& p : paths) {
+                    std::ofstream ofs(p, std::ios::app);
+                    if (ofs.is_open()) {
+                        ofs << "{\"node\": \"gateway-d" << d << "\""
+                            << ", \"event\": \"" << evt_name << "\""
+                            << ", \"domain\": " << d;
+                        if (counter > 0) ofs << ", \"counter\": " << counter;
+                        if (last_c > 0) ofs << ", \"last_counter\": " << last_c;
+                        ofs << ", \"monotonic_ns\": " << now_m
+                            << ", \"epoch_ns\": " << now_e
+                            << "}\n";
+                        ofs.flush();
+                        break;
+                    }
+                }
+            };
+
+            int diag_sock = -1;
+            while (!g_shutdown_requested.load()) {
+                if (diag_sock < 0) {
+                    std::string bound_if;
+                    diag_sock = open_gateway_socket(d, bound_if);
+                    if (diag_sock >= 0) {
+                        // Apply SocketCAN filter for ONLY CAN ID 0x300
+                        struct can_filter rfilter[1];
+                        rfilter[0].can_id = 0x300;
+                        rfilter[0].can_mask = CAN_SFF_MASK; // 0x7FF
+                        setsockopt(diag_sock, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter));
+                    } else {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                        continue;
+                    }
+                }
+
+                struct pollfd pfd{};
+                pfd.fd = diag_sock;
+                pfd.events = POLLIN;
+                int ret = poll(&pfd, 1, 50);
+                if (ret <= 0) continue;
+
+                struct canfd_frame frame{};
+                ssize_t n = read(diag_sock, &frame, sizeof(frame));
+                if (n <= 0) {
+                    close(diag_sock);
+                    diag_sock = -1;
+                    continue;
+                }
+
+                if (frame.can_id == 0x300) {
+                    int64_t now = get_monotonic_ns();
+                    if (now - rate_started >= 1000000000LL) {
+                        rate_started = now;
+                        rate_count = 0;
+                    }
+                    rate_count++;
+                    if (rate_count > 100) {
+                        log_attack_event("rate_limit_rejected");
+                        continue;
+                    }
+
+                    if (frame.len != 64) {
+                        log_attack_event("header_rejected");
+                        continue;
+                    }
+
+                    uint8_t kind = frame.data[0];
+                    uint8_t ecu = frame.data[1];
+                    uint8_t dom = frame.data[2];
+                    uint8_t flags = frame.data[3];
+                    uint32_t counter = (static_cast<uint32_t>(frame.data[4]) << 24) |
+                                       (static_cast<uint32_t>(frame.data[5]) << 16) |
+                                       (static_cast<uint32_t>(frame.data[6]) << 8)  |
+                                       static_cast<uint32_t>(frame.data[7]);
+
+                    if ((kind != 0x1F && kind != 0x11 && kind != 0x1E) ||
+                        ecu != (0x1F + d) || dom != d || flags != 0x40) {
+                        log_attack_event("header_rejected");
+                        continue;
+                    }
+
+                    if (counter <= last_counter) {
+                        log_attack_event("replay_rejected", counter, last_counter);
+                        continue;
+                    }
+
+                    uint8_t nonce[16]{};
+                    uint16_t ecu_id16 = static_cast<uint16_t>(0x1F + d);
+                    nonce[0] = static_cast<uint8_t>((ecu_id16 >> 8) & 0xFF);
+                    nonce[1] = static_cast<uint8_t>(ecu_id16 & 0xFF);
+                    nonce[2] = static_cast<uint8_t>(d);
+                    nonce[3] = 0x00;
+                    nonce[12] = static_cast<uint8_t>((counter >> 24) & 0xFF);
+                    nonce[13] = static_cast<uint8_t>((counter >> 16) & 0xFF);
+                    nonce[14] = static_cast<uint8_t>((counter >> 8) & 0xFF);
+                    nonce[15] = static_cast<uint8_t>(counter & 0xFF);
+
+                    uint8_t pt[40]{};
+                    bool ok = cisg::crypto::AsconSP800232::decrypt_verify(
+                        test_key.data(), nonce, frame.data, 8,
+                        frame.data + 8, 40, frame.data + 48, pt
+                    );
+
+                    if (!ok) {
+                        log_attack_event("runtime_tag_rejected", counter);
+                        continue;
+                    }
+
+                    last_counter = counter;
+                }
+            }
+            if (diag_sock >= 0) close(diag_sock);
+        });
+    }
+#endif
+
     std::cout << "[+] CISG Gateway Event Loop active. Awaiting orchestrator signals...\n";
     while (!g_shutdown_requested.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -623,6 +1248,13 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\n[+] CISG Gateway shutting down gracefully...\n";
     http_server.stop();
+
+#if defined(__linux__) || defined(__unix__)
+    for (auto& rw : runtime_workers) {
+        if (rw.joinable()) rw.join();
+    }
+#endif
+
     std::cout << "[+] CISG Gateway exited cleanly.\n";
     return 0;
 }

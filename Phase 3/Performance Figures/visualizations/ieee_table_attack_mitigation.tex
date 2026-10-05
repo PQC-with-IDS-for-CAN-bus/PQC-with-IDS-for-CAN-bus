@@ -1,0 +1,17 @@
+% IEEE Format: Adversarial Stress Test Evaluation
+\begin{table}[h]
+\centering
+\caption{Adversarial Injection Evaluation on Central Security Gateway}
+\label{tab:attack_mitigation}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Attack Vector} & \textbf{Adversarial Frames} & \textbf{Observed Count} & \textbf{Mitigation Policy} & \textbf{Defense Rate} \\
+\midrule
+Replay Injection & 1 & 1 & Cat 3.1 Nonce & 100.0\% \\
+Forged Tag & 1 & 1 & Ascon-AEAD128 & 100.0\% \\
+Domain Spoofing & 1 & 1 & Ingress Filtering & 100.0\% \\
+DoS / Bus Flood & 300 & 202 & Token Bucket Limiter & 100.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}

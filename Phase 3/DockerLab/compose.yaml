@@ -40,6 +40,8 @@ x-app: &app
     - NET_RAW      # SocketCAN raw frame access
     - NET_ADMIN    # Interface configuration & routing
     - IPC_LOCK     # ASIL-D mlockall memory page locking
+    - PERFMON      # Kernel 5.8+ PMU monitoring capability
+    - SYS_PTRACE   # Required for perf_event_open inspection
   security_opt:
     - no-new-privileges:true
   networks:
@@ -188,7 +190,9 @@ services:
     image: pqc-can-lab:cpp17
     container_name: dockerlab-attacker
     user: '${LAB_UID:-1000}:${LAB_GID:-1000}'
+    working_dir: /workspace/Phase 3/DockerLab
     command: ["python3", "attacker.py"]
+    restart: unless-stopped
     init: true
     read_only: false
     tmpfs: [/tmp]
@@ -210,7 +214,9 @@ services:
     profiles: [tools]
     working_dir: /workspace/Phase 3/DockerLab
     command: ["python3", "controller.py"]
-    cap_add: []
+    cap_add:
+      - PERFMON
+      - SYS_PTRACE
     healthcheck:
       disable: true
     volumes:

@@ -1,0 +1,51 @@
+% IEEE Format: Phase 3 Physical CAN-FD Fault Resilience & Retransmission Benchmark
+\begin{table*}[t]
+\centering
+\caption{Live Empirical Benchmarks across 31 Multi-Domain Fault Scenarios under NIST FIPS 204 & ISO 26262 ASIL-D}
+\label{tab:fault_recovery_benchmark}
+\small
+\begin{tabular}{cllcccccc}
+\toprule
+\textbf{Run} & \textbf{Scenario Description} & \textbf{Injected Fault Model} & \textbf{Retx} & \textbf{Recovered} & \textbf{Wire Bytes} & \textbf{Goodput (\%)} & \textbf{Latency (ms)} & \textbf{ISO 26262 State} \\
+\midrule
+01 & Clean Bus (Nominal) & NOMINAL\_CLEAN & 0 & 0 & 2624 & 92.8\% & 19.55 & OPERATIONAL \\
+02 & Clean Bus (Nominal) & NOMINAL\_CLEAN & 0 & 0 & 2624 & 92.8\% & 21.54 & OPERATIONAL \\
+03 & Clean Bus (Nominal) & NOMINAL\_CLEAN & 0 & 0 & 2624 & 92.8\% & 20.98 & OPERATIONAL \\
+04 & Clean Bus (Nominal) & NOMINAL\_CLEAN & 0 & 0 & 2624 & 92.8\% & 21.44 & OPERATIONAL \\
+\midrule
+05 & Isolated Single Frame Drop & SINGLE\_FRAME\_DROP & 1 & 1 & 2704 & 90.1\% & 31.23 & OPERATIONAL \\
+06 & Isolated Single Frame Drop & SINGLE\_FRAME\_DROP & 1 & 1 & 2704 & 90.1\% & 31.77 & OPERATIONAL \\
+07 & Isolated Single Frame Drop & SINGLE\_FRAME\_DROP & 1 & 1 & 2704 & 90.1\% & 30.33 & OPERATIONAL \\
+08 & Isolated Single Frame Drop & SINGLE\_FRAME\_DROP & 1 & 1 & 2704 & 90.1\% & 28.40 & OPERATIONAL \\
+\midrule
+09 & Late-Sequence Frame Drop & LATE\_SEQUENCE\_DROP & 1 & 1 & 2704 & 90.1\% & 31.65 & OPERATIONAL \\
+10 & Late-Sequence Frame Drop & LATE\_SEQUENCE\_DROP & 1 & 1 & 2704 & 90.1\% & 33.42 & OPERATIONAL \\
+11 & Late-Sequence Frame Drop & LATE\_SEQUENCE\_DROP & 1 & 1 & 2704 & 90.1\% & 30.65 & OPERATIONAL \\
+12 & Late-Sequence Frame Drop & LATE\_SEQUENCE\_DROP & 1 & 1 & 2704 & 90.1\% & 29.74 & OPERATIONAL \\
+\midrule
+13 & Inductive Relay Transient Spike & BURST\_FRAME\_DROP & 3 & 3 & 2832 & 86.0\% & 39.95 & OPERATIONAL \\
+14 & Inductive Relay Transient Spike & BURST\_FRAME\_DROP & 3 & 3 & 2832 & 86.0\% & 34.96 & OPERATIONAL \\
+15 & Inductive Relay Transient Spike & BURST\_FRAME\_DROP & 3 & 3 & 2832 & 86.0\% & 23.56 & OPERATIONAL \\
+16 & Inductive Relay Transient Spike & BURST\_FRAME\_DROP & 3 & 3 & 2832 & 86.0\% & 29.18 & OPERATIONAL \\
+\midrule
+17 & Alternator Commutation Burst & BURST\_FRAME\_DROP & 8 & 8 & 3152 & 77.3\% & 39.26 & OPERATIONAL \\
+18 & Alternator Commutation Burst & BURST\_FRAME\_DROP & 8 & 8 & 3152 & 77.3\% & 31.59 & OPERATIONAL \\
+19 & Alternator Commutation Burst & BURST\_FRAME\_DROP & 8 & 8 & 3152 & 77.3\% & 32.04 & OPERATIONAL \\
+20 & Alternator Commutation Burst & BURST\_FRAME\_DROP & 8 & 8 & 3152 & 77.3\% & 30.21 & OPERATIONAL \\
+\midrule
+21 & Isolated Single Frame Drop & SINGLE\_FRAME\_DROP & 3 & 0 & 2864 & 0.0\% & 93.99 & SAFE\_FALLBACK \\
+22 & Isolated Single Frame Drop & NACK\_CONTROL\_FRAME\_DROP & 0 & 0 & 2672 & 0.0\% & 90.71 & SAFE\_FALLBACK \\
+23 & Clean Bus (Nominal) & PAYLOAD\_BIT\_FLIP & 0 & 0 & 2624 & 0.0\% & 30.08 & SAFE\_FALLBACK \\
+24 & Clean Bus (Nominal) & PAYLOAD\_BIT\_FLIP & 3 & 0 & 2864 & 0.0\% & 60.38 & SAFE\_FALLBACK \\
+25 & Clean Bus (Nominal) & PAYLOAD\_BIT\_FLIP & 1 & 1 & 2704 & 90.1\% & 36.72 & OPERATIONAL \\
+\midrule
+26 & Monte Carlo Loss Sweep & BERNOULLI\_RANDOM & 13 & 13 & 3472 & 70.2\% & 35.25 & OPERATIONAL \\
+27 & Monte Carlo Loss Sweep & BERNOULLI\_RANDOM & 13 & 13 & 3472 & 70.2\% & 16.67 & OPERATIONAL \\
+28 & Monte Carlo Loss Sweep & BERNOULLI\_RANDOM & 13 & 13 & 3472 & 70.2\% & 46.10 & OPERATIONAL \\
+29 & Monte Carlo Loss Sweep & BERNOULLI\_RANDOM & 13 & 13 & 3472 & 70.2\% & 36.50 & OPERATIONAL \\
+30 & Monte Carlo Loss Sweep & BERNOULLI\_RANDOM & 13 & 13 & 3472 & 70.2\% & 39.65 & OPERATIONAL \\
+\midrule
+31 & Clean Bus (Nominal) & NOMINAL\_CLEAN & 0 & 0 & 2624 & 92.8\% & 28.89 & OPERATIONAL \\
+\bottomrule
+\end{tabular}
+\end{table*}
