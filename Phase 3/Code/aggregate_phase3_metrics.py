@@ -228,10 +228,11 @@ def main():
     schema_path = os.path.join(CONFIG_DIR, 'data_contract_schemas.json')
     validator = DataContractValidator(schema_path)
 
-    if args.live and args.perf_csv and args.tcp_csv and args.fault_csv:
-        perf_path = args.perf_csv
-        tcp_path = args.tcp_csv
-        fault_path = args.fault_csv
+    if args.live:
+        sim_fault = os.path.join(BASE_DIR, 'DockerLab', 'simulation_results', 'fault_recovery_runs.csv')
+        perf_path = args.perf_csv or os.path.join(DATA_DIR, 'perf_stat_summary.csv')
+        tcp_path = args.tcp_csv or os.path.join(DATA_DIR, 'tcpdump_latency_summary.csv')
+        fault_path = args.fault_csv or (sim_fault if os.path.exists(sim_fault) else os.path.join(DATA_DIR, 'fault_recovery_runs.csv'))
         provenance = "LIVE_EMPIRICAL_TELEMETRY"
     else:
         perf_path = os.path.join(FIXTURES_DIR, 'sample_perf_stat_summary.csv')

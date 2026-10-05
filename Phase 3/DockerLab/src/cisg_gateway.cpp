@@ -207,6 +207,7 @@ namespace {
      * @brief Log fragment accepted event for controller verification
      */
     void log_fragment_event(const std::string& run_id, int domain, uint8_t frame_idx, uint8_t round,
+                            const uint8_t* payload, size_t payload_len,
                             uint64_t kernel_epoch_ns, int64_t epoch_ns, int64_t monotonic_ns) {
         std::vector<std::string> candidate_paths = {
             "/logs/gateway/events.jsonl",
@@ -231,8 +232,14 @@ namespace {
            << ", \"run_id\": \"" << run_id << "\""
            << ", \"event\": \"fragment_accepted\""
            << ", \"domain\": " << domain
+           << ", \"can_id\": \"0x200\""
            << ", \"frame_idx\": " << static_cast<int>(frame_idx)
            << ", \"round\": " << static_cast<int>(round)
+           << ", \"payload_hex\": \"" << to_hex_str(payload, payload_len) << "\""
+           << ", \"payload_bytes\": " << payload_len
+           << ", \"dlc\": 15"
+           << ", \"brs_flag\": 1"
+           << ", \"esi_flag\": 0"
            << ", \"kernel_epoch_ns\": " << kernel_epoch_ns
            << ", \"epoch_ns\": " << epoch_ns
            << ", \"monotonic_ns\": " << monotonic_ns
@@ -402,6 +409,9 @@ namespace {
 
         cisg::protocol::BlockTransferReassembler reassembler;
         cisg::ml::ModeBQuarantineBuffer quarantine_buffer;
+
+        std::atomic<int> diagnostic_accepted{0};
+        std::atomic<uint32_t> last_counter{0};
     };
 }
 
@@ -553,6 +563,8 @@ int main(int argc, char* argv[]) {
         if (scenario.empty()) scenario = "clean";
         std::vector<int> drops = extract_json_int_array(req.body, "drops");
         uint32_t session_id = static_cast<uint32_t>(extract_json_uint64(req.body, "session_id", 0x12345678));
+        std::string admission_policy = extract_json_str(req.body, "admission_policy");
+        if (admission_policy.empty()) admission_policy = "enforce";
         double ftti_us = 50000.0;
 
         if (domain < 1 || domain > 4) {
@@ -572,11 +584,13 @@ int main(int argc, char* argv[]) {
         }
 
         // Execute attestation handshake and IDS inference pipeline asynchronously
-        std::thread([st_ptr, run_id, domain, scenario, drops, session_id, ftti_us, &mldsa_engine, &onnx_engine, test_key]() {
+        std::thread([st_ptr, run_id, domain, scenario, drops, session_id, admission_policy, ftti_us, &mldsa_engine, &onnx_engine, test_key]() {
             int64_t started_ns = get_monotonic_ns();
 
-            // 1. Reset reassembler for session
+            // 1. Reset reassembler and runtime diagnostic counters for new session
             st_ptr->reassembler.reset(static_cast<uint8_t>(session_id & 0xFF));
+            st_ptr->diagnostic_accepted.store(0);
+            st_ptr->last_counter.store(0);
 
             // Ensure SocketCAN is open (lazy retry if bound late by topology script)
 #if defined(__linux__) || defined(__unix__)
@@ -689,7 +703,7 @@ int main(int argc, char* argv[]) {
                             std::chrono::system_clock::now().time_since_epoch()).count();
                         if (kernel_epoch_ns == 0) kernel_epoch_ns = static_cast<uint64_t>(now_epoch);
 
-                        log_fragment_event(run_id, domain, f_idx, round, kernel_epoch_ns, now_epoch, now_mono);
+                        log_fragment_event(run_id, domain, f_idx, round, data, len, kernel_epoch_ns, now_epoch, now_mono);
                     }
                 }
             };
@@ -709,7 +723,7 @@ int main(int argc, char* argv[]) {
                     auto now_t = std::chrono::steady_clock::now();
                     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                         now_t - burst_start).count();
-                    if (total_ms > 40) break; // Overall burst timeout fallback
+                    if (total_ms > 45) break; // Overall burst timeout fallback
 
                     if (got_any_frame) {
                         auto gap_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -927,6 +941,8 @@ int main(int argc, char* argv[]) {
             // 5. Authentic Cryptographic Verification Gate
             bool ascon_tag_valid = false;
             bool mldsa_signature_valid = false;
+            int64_t ascon_decrypt_ns = 0;
+            int64_t mldsa_verify_ns = 0;
             std::array<uint8_t, cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES> recovered_sig{};
 
             if (status == "SUCCESS" && st_ptr->reassembler.is_complete()) {
@@ -942,6 +958,7 @@ int main(int argc, char* argv[]) {
                     cisg::crypto::AsconSP800232::derive_in_memory_nonce(0x200, 1, nonce);
                     std::array<uint8_t, 8> ad_hdr{0x11, static_cast<uint8_t>(0x1F + domain), static_cast<uint8_t>(domain), 0x40, 0, 0, 0, 1};
 
+                    int64_t t_dec_0 = get_monotonic_ns();
                     ascon_tag_valid = cisg::crypto::AsconSP800232::decrypt_verify(
                         test_key.data(),
                         nonce.data(),
@@ -952,10 +969,12 @@ int main(int argc, char* argv[]) {
                         tag_ptr,
                         recovered_sig.data()
                     );
+                    ascon_decrypt_ns = std::max<int64_t>(1, get_monotonic_ns() - t_dec_0);
 
                     if (!ascon_tag_valid) {
                         status = "ERR_CRYPTO_TAG_MISMATCH";
                     } else {
+                        int64_t t_ver_0 = get_monotonic_ns();
                         mldsa_signature_valid = mldsa_engine.verify(
                             canonical_transcript.data(),
                             canonical_transcript.size(),
@@ -963,6 +982,7 @@ int main(int argc, char* argv[]) {
                             recovered_sig.size(),
                             st_ptr->ecu_pk
                         );
+                        mldsa_verify_ns = std::max<int64_t>(1, get_monotonic_ns() - t_ver_0);
 
                         if (!mldsa_signature_valid) {
                             status = "ERR_CRYPTO_SIG_INVALID";
@@ -976,10 +996,12 @@ int main(int argc, char* argv[]) {
                                                  90.0f, 0.1f, -0.1f, 0.0f, 0.0f, 0.05f};
             std::array<float, 420> window_in{};
             std::array<float, 420> rec_out{};
+            int64_t t_onnx_0 = get_monotonic_ns();
             st_ptr->quarantine_buffer.stage_candidate(test_kinematics, window_in);
             onnx_engine.run_inference(window_in.data(), rec_out.data());
             cisg::ml::AnomalyVerdict verdict = cisg::ml::Tier2InferenceEngine::evaluate_anomaly(window_in.data(), rec_out.data());
             st_ptr->quarantine_buffer.commit_verdict(verdict.is_anomaly, test_kinematics);
+            int64_t onnx_int8_ns = std::max<int64_t>(1, get_monotonic_ns() - t_onnx_0);
 
             int64_t authenticated_ns = get_monotonic_ns();
             double latency_us = (authenticated_ns - started_ns) / 1000.0;
@@ -989,8 +1011,9 @@ int main(int argc, char* argv[]) {
                 std::chrono::system_clock::now().time_since_epoch()).count();
             log_auth_event(run_id, domain, ascon_tag_valid, mldsa_signature_valid, authenticated_ns, now_epoch_auth);
 
-            // Transmit Cat 3.3 Session Key Delivery (CAN ID 0x203) to ECU upon successful attestation
-            if (status == "SUCCESS") {
+            // Transmit Cat 3.3 Session Key Delivery (CAN ID 0x203) to ECU upon successful admitted attestation
+            bool key_delivered = (status == "SUCCESS") && (within_budget || admission_policy == "observe");
+            if (key_delivered) {
                 uint8_t key_frame[64]{0};
                 key_frame[0] = 0x14; // PROTOCOL_VER_TYPE
                 key_frame[1] = 0xFF; // Gateway ECU ID
@@ -1059,6 +1082,15 @@ int main(int argc, char* argv[]) {
                         break;
                     }
                 }
+
+                // Wait up to 20ms for ECU's 0x300 diagnostic frame to be verified by runtime_workers
+                auto diag_wait_start = std::chrono::steady_clock::now();
+                while (st_ptr->diagnostic_accepted.load() == 0) {
+                    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - diag_wait_start).count();
+                    if (elapsed_ms >= 20) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
             }
 
             // 7. Format structured Result JSON matching controller.py expectations
@@ -1076,11 +1108,14 @@ int main(int argc, char* argv[]) {
             res << "  \"session_id\": " << session_id << ",\n";
             res << "  \"received_frames\": " << st_ptr->reassembler.received_count() << ",\n";
             res << "  \"first_rx_ns\": " << first_rx_ns << ",\n";
-            res << "  \"key_delivered\": " << (status == "SUCCESS" ? "true" : "false") << ",\n";
-            res << "  \"diagnostic_accepted\": " << (status == "SUCCESS" ? 1 : 0) << ",\n";
+            res << "  \"key_delivered\": " << (key_delivered ? "true" : "false") << ",\n";
+            res << "  \"diagnostic_accepted\": " << st_ptr->diagnostic_accepted.load() << ",\n";
             res << "  \"within_admission_budget\": " << (within_budget ? "true" : "false") << ",\n";
             res << "  \"ascon_tag_valid\": " << (ascon_tag_valid ? "true" : "false") << ",\n";
             res << "  \"mldsa_signature_valid\": " << (mldsa_signature_valid ? "true" : "false") << ",\n";
+            res << "  \"ascon_decrypt_ns\": " << ascon_decrypt_ns << ",\n";
+            res << "  \"mldsa_verify_ns\": " << mldsa_verify_ns << ",\n";
+            res << "  \"onnx_int8_ns\": " << onnx_int8_ns << ",\n";
             res << "  \"verification_evidence\": {\n";
             res << "    \"signature_hex\": \"" << to_hex_str(recovered_sig.data(), recovered_sig.size()) << "\",\n";
             res << "    \"challenge_hex\": \"" << to_hex_str(challenge_16B.data(), challenge_16B.size()) << "\",\n";
@@ -1112,10 +1147,9 @@ int main(int argc, char* argv[]) {
 #if defined(__linux__) || defined(__unix__)
     std::vector<std::thread> runtime_workers;
     for (int d = 1; d <= 4; ++d) {
-        runtime_workers.emplace_back([d, test_key]() {
+        runtime_workers.emplace_back([d, test_key, &domains]() {
             int64_t rate_started = 0;
             int rate_count = 0;
-            uint32_t last_counter = 0;
 
             auto log_attack_event = [d](const std::string& evt_name, uint32_t counter = 0, uint32_t last_c = 0) {
                 int64_t now_m = get_monotonic_ns();
@@ -1206,8 +1240,9 @@ int main(int argc, char* argv[]) {
                         continue;
                     }
 
-                    if (counter <= last_counter) {
-                        log_attack_event("replay_rejected", counter, last_counter);
+                    uint32_t prev_counter = domains[d]->last_counter.load();
+                    if (counter <= prev_counter) {
+                        log_attack_event("replay_rejected", counter, prev_counter);
                         continue;
                     }
 
@@ -1233,7 +1268,8 @@ int main(int argc, char* argv[]) {
                         continue;
                     }
 
-                    last_counter = counter;
+                    domains[d]->last_counter.store(counter);
+                    domains[d]->diagnostic_accepted.fetch_add(1);
                 }
             }
             if (diag_sock >= 0) close(diag_sock);

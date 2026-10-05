@@ -299,7 +299,10 @@ namespace {
     }
 
     int get_or_open_can_socket(int& current_sock, const std::string& preferred_iface, int domain_id, std::string& out_bound_iface) {
-        if (current_sock >= 0) return current_sock;
+        if (current_sock >= 0) {
+            if (out_bound_iface.empty() || out_bound_iface == "virtual") out_bound_iface = "can0";
+            return current_sock;
+        }
         current_sock = open_socketcan_raw(preferred_iface, domain_id, out_bound_iface);
         return current_sock;
     }
@@ -514,7 +517,9 @@ int main(int argc, char* argv[]) {
             // 2. Execute genuine NIST FIPS 204 ML-DSA-44 signature generation
             cisg::pqc::Signature sig{};
             size_t sig_len = 0;
+            int64_t t_sign_0 = get_monotonic_ns();
             mldsa_engine.sign(canonical_transcript.data(), canonical_transcript.size(), sk, sig, sig_len);
+            int64_t mldsa_sign_ns = std::max<int64_t>(1, get_monotonic_ns() - t_sign_0);
 
             // 3. Encapsulate into 2,436B PAO buffer with 16B Ascon tag
             std::array<uint8_t, 2436> pao{};
@@ -525,10 +530,12 @@ int main(int argc, char* argv[]) {
             std::array<uint8_t, 8> ad_hdr{0x11, static_cast<uint8_t>(0x1F + domain_id), static_cast<uint8_t>(domain_id), 0x40, 0, 0, 0, 1};
 
             std::array<uint8_t, 16> tag{};
+            int64_t t_enc_0 = get_monotonic_ns();
             cisg::crypto::AsconSP800232::encrypt(test_key.data(), nonce.data(),
                                                 ad_hdr.data(), ad_hdr.size(),
                                                 pao.data(), cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES,
                                                 pao.data(), tag.data());
+            int64_t ascon_encrypt_ns = std::max<int64_t>(1, get_monotonic_ns() - t_enc_0);
             std::memcpy(pao.data() + cisg::pqc::MLDSA44Constants::SIGNATURE_BYTES, tag.data(), 16);
 
             // 4. Packetize PAO into 41 CAN-FD frames
@@ -546,8 +553,7 @@ int main(int argc, char* argv[]) {
             can_fd = get_or_open_can_socket(global_can_sock, iface_name, domain_id, bound_iface);
 #endif
 
-            // 6. Live Transmission & ISO 11898-1 Wire Pacing Loop (Round 0)
-            double single_frame_us = cisg::timing::CANFDWireModel::calculate_frame_duration_us(64, false);
+            // 6. Live Transmission Loop (Round 0 — physical wire serialization paced once in relay_node)
             for (int i = 0; i < 41; ++i) {
 #if defined(__linux__) || defined(__unix__)
                 if (can_fd >= 0) {
@@ -575,9 +581,6 @@ int main(int argc, char* argv[]) {
                 log_tx_event(run_id, domain_id, (can_fd >= 0 ? bound_iface : "virtual"),
                              static_cast<uint8_t>(i), 41, 0, frames[i].data(), 64,
                              now_monotonic, now_epoch);
-
-                // Inject physical copper wire serialization delay (nominal 331.5 us per 64B frame)
-                cisg::timing::CANFDWireModel::inject_wire_delay(single_frame_us);
             }
 
             // 7. Listen for Selective NACK (CAN ID 0x201) and Retransmit Missing Frames
@@ -652,8 +655,6 @@ int main(int argc, char* argv[]) {
                                             log_tx_event(run_id, domain_id, bound_iface,
                                                          static_cast<uint8_t>(i), 41, nack_round, frames[i].data(), 64,
                                                          now_monotonic, now_epoch);
-
-                                            cisg::timing::CANFDWireModel::inject_wire_delay(single_frame_us);
                                         }
                                     }
                                     // Reset deadline for another 60ms to wait for subsequent NACK or KEY
@@ -667,7 +668,7 @@ int main(int argc, char* argv[]) {
 #endif
 
             int64_t terminal_ns = get_monotonic_ns();
-            std::string ecu_status = (scenario == "nack_drop") ? "ERR_TIMEOUT_NACK_WAIT" : "SUCCESS";
+            std::string ecu_status = session_activated ? "SUCCESS" : "ERR_TIMEOUT_NACK_WAIT";
 
 #if defined(__linux__) || defined(__unix__)
             if (ecu_status == "SUCCESS" && can_fd >= 0) {
@@ -721,6 +722,8 @@ int main(int argc, char* argv[]) {
             ss << "{\n";
             ss << "  \"status\": \"" << ecu_status << "\",\n";
             ss << "  \"terminal_ns\": " << terminal_ns << ",\n";
+            ss << "  \"mldsa_sign_ns\": " << mldsa_sign_ns << ",\n";
+            ss << "  \"ascon_encrypt_ns\": " << ascon_encrypt_ns << ",\n";
             ss << "  \"nack_rounds\": " << nack_rounds_count << "\n";
             ss << "}";
 

@@ -108,21 +108,39 @@ $$\mathbf{x}_{\text{valid}} \longleftarrow \begin{cases}
 | :--- | :---: | :---: | :---: |
 | **SRAM Memory Footprint** | $30 \times 14 \times 4\text{ B} = 1,680\text{ B}$ | $30 \times 14 \times 4\text{ B} + 56\text{ B} = 1,736\text{ B}$ | $+56\text{ Bytes}$ (Negligible) |
 | **Pointer Swap Latency** | $8.2\text{ ns}$ | $14.1\text{ ns}$ | $+5.9\text{ ns}$ (Zero-Impact) |
-| **ONNX Runtime Latency (RPi4)** | $0.820\text{ ms}$ | $0.820\text{ ms}$ | $\mathbf{0.000\% \text{ Change}}$ |
+| **ONNX Runtime Latency (RPi4 / x86 INT8)** | $0.820\text{ ms}$ | $0.820\text{ ms}$ | $\mathbf{0.000\% \text{ Change}}$ |
 | **Post-Attack Recovery Frames** | $29\text{ Frames}$ ($290\text{ ms}$) | $\mathbf{0\text{ Frames}}$ ($\mathbf{0\text{ ms}}$) | $\mathbf{100\% \text{ Elimination}}$ |
+
+### 2.3 EndeavourOS 31-Run Empirical SocketCAN Fault-Recovery & FTTI Benchmark
+
+In addition to the analytical schedulability baseline ($13.61\text{ ms}$ wire-only nominal / $24.19\text{ ms}$ host+wire nominal), the complete 31-run multi-container SocketCAN (`vxcan`, `SO_TIMESTAMPNS`) suite was executed on EndeavourOS Linux (`DockerLab/simulation_results/fault_recovery_runs.csv`):
+
+| Runs | Scenario Description | Fault Model | Dropped Frames | NACK Rounds | Wire Bytes | Goodput | Latency Range / Mean ($\text{ms}$) | ISO 26262 State |
+| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **01–04, 31** | Clean Bus (Nominal) | `NOMINAL_CLEAN` | $0$ | $0$ | $2,624\text{ B}$ | $92.84\%$ | $19.55\text{–}28.89\text{ ms}$ ($22.48 \pm 3.65\text{ ms}$) | **OPERATIONAL** |
+| **05–08** | Isolated Single Drop | `SINGLE_FRAME_DROP` | $1$ (`12`) | $1$ | $2,704\text{ B}$ | $90.09\%$ | $28.40\text{–}31.77\text{ ms}$ ($30.43 \pm 1.48\text{ ms}$) | **OPERATIONAL** |
+| **09–12** | Late-Sequence Drop | `LATE_SEQUENCE_DROP` | $1$ (`38`) | $1$ | $2,704\text{ B}$ | $90.09\%$ | $29.74\text{–}33.42\text{ ms}$ ($31.37 \pm 1.55\text{ ms}$) | **OPERATIONAL** |
+| **13–16** | Inductive Relay Spike | `BURST_FRAME_DROP` | $3$ (`14..16`) | $1$ | $2,832\text{ B}$ | $86.02\%$ | $23.56\text{–}39.95\text{ ms}$ ($31.91 \pm 7.03\text{ ms}$) | **OPERATIONAL** |
+| **17–20** | Alternator Burst | `BURST_FRAME_DROP` | $8$ (`20..27`) | $1$ | $3,152\text{ B}$ | $77.28\%$ | $30.21\text{–}39.26\text{ ms}$ ($33.28 \pm 4.07\text{ ms}$) | **OPERATIONAL** |
+| **21** | Persistent Drop (Retry Exhaustion) | `SINGLE_FRAME_DROP` | $1$ (`12` all rnds) | $3$ | $2,864\text{ B}$ | $0.00\%$ | $93.99\text{ ms}$ (`ERR_RETRY_EXHAUSTION`) | **SAFE_FALLBACK** |
+| **22** | Lost NACK Control Drop | `NACK_CONTROL_FRAME_DROP` | $1$ (`12` + NACK) | $3$ | $2,672\text{ B}$ | $0.00\%$ | $90.71\text{ ms}$ (`ERR_TIMEOUT_NACK_WAIT`) | **SAFE_FALLBACK** |
+| **23** | Corrupt Payload (Tag Mismatch) | `PAYLOAD_BIT_FLIP` | $0$ (Bit-Flip) | $0$ | $2,624\text{ B}$ | $0.00\%$ | $30.08\text{ ms}$ (`ERR_CRYPTO_TAG_MISMATCH`) | **SAFE_FALLBACK** |
+| **24** | Malformed Header (Out-of-Range) | `PAYLOAD_BIT_FLIP` | $0$ (`idx=0xFF`) | $3$ | $2,864\text{ B}$ | $0.00\%$ | $60.38\text{ ms}$ (`ERR_HEADER_OUT_OF_RANGE`) | **SAFE_FALLBACK** |
+| **25** | Transient Header Probe | `PAYLOAD_BIT_FLIP` | $0$ (Rnd 0 `0xFF`) | $1$ | $2,704\text{ B}$ | $90.09\%$ | $36.72\text{ ms}$ (`SUCCESS`) | **OPERATIONAL** |
+| **26–30** | Monte Carlo Loss Sweep ($p=0.2$) | `BERNOULLI_RANDOM` | $13$ | $1$ | $3,472\text{ B}$ | $70.16\%$ | $16.67\text{–}46.10\text{ ms}$ ($34.83 \pm 10.97\text{ ms}$) | **OPERATIONAL** |
 
 ---
 
 ## 3. Empirical Benchmark Leaderboard
 
-Evaluated across the official ORNL ROAD masquerade datasets comparing Mode A (Legacy FIFO) against Mode B (Stateful Buffer Quarantine):
+Evaluated across the official ORNL ROAD masquerade datasets comparing Mode A (Legacy FIFO) against Mode B (Stateful Buffer Quarantine) via [`Code/buffer_quarantine_benchmark.py`](file:///C:/Users/tapan/Downloads/7th%20sem%20Capstone/Anti%20Gravity/Phase%203/Code/buffer_quarantine_benchmark.py):
 
-| Physical Attack Scenario | Target Subsystem | Mode A FPR | Mode B FPR | Mode A Recall | Mode B Recall | Mode A Latency | Mode B Latency | Schedulability Headroom | ASIL-D Verdict |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Speedometer Spoofing (Run 1)** | CAN ID `0x0D0` (208) | $1.21\%$ | $\mathbf{1.21\%}$ | $100.00\%$ | $\mathbf{100.00\%}$ | $0.82\text{ ms}$ | $0.82\text{ ms}$ | $91.8\%$ | **PASS (ASIL-D Compliant)** |
-| **Correlated Wheel Speed (Run 1)** | CAN ID `0x6E0` (1760) | $2.94\%$ | $\mathbf{2.94\%}$ | $100.00\%$ | $\mathbf{100.00\%}$ | $0.82\text{ ms}$ | $0.82\text{ ms}$ | $91.8\%$ | **PASS (ASIL-D Compliant)** |
-| **Engine Coolant Temp Spoofing** | CAN ID `0x4E7` (1255) | $0.46\%$ | $\mathbf{0.46\%}$ | $95.35\%$ | $\mathbf{95.35\%}$ | $0.82\text{ ms}$ | $0.82\text{ ms}$ | $91.8\%$ | **PASS (ASIL-D Compliant)** |
-| **Clean Fleet Baseline (Dataset C2)** | Fleet Reverse Drive | $0.00\%$ | $\mathbf{0.00\%}$ | N/A | N/A | $0.82\text{ ms}$ | $0.82\text{ ms}$ | $91.8\%$ | **PASS (Zero False Alarms)** |
+| Physical Attack Scenario | Target Subsystem | Mode A Overall FPR | Mode B Overall FPR | FPR Reduction | Mode A Recall | Mode B Recall | Mode A Post-Atk Smeared Frames | Mode B Post-Atk Smeared Frames | Mode A F1 | Mode B F1 | Latency | ASIL-D Verdict |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Speedometer Spoofing (Run 1)** | CAN ID `0x0D0` (208) | $1.21\%$ | $\mathbf{1.18\%}$ | $\mathbf{-0.03\%}$ | $100.00\%$ | $\mathbf{100.00\%}$ | $29$ ($16.11\%$ window) | $\mathbf{0}$ ($\mathbf{0.00\%}$) | $0.9845$ | $\mathbf{0.9849}$ | $0.82\text{ ms}$ | **PASS (ASIL-D Compliant)** |
+| **Correlated Wheel Speed (Run 1)** | CAN ID `0x6E0` (1760) | $2.94\%$ | $\mathbf{2.20\%}$ | $\mathbf{-0.73\%}$ | $100.00\%$ | $\mathbf{100.00\%}$ | $29$ ($16.11\%$ window) | $\mathbf{0}$ ($\mathbf{0.00\%}$) | $0.9914$ | $\mathbf{0.9936}$ | $0.82\text{ ms}$ | **PASS (ASIL-D Compliant)** |
+| **Engine Coolant Temp Spoofing** | CAN ID `0x4E7` (1255) | $0.46\%$ | $\mathbf{0.00\%}$ | $\mathbf{-0.46\%}$ | $97.67\%$ | $\mathbf{100.00\%}$ | $17$ ($9.44\%$ window) | $\mathbf{0}$ ($\mathbf{0.00\%}$) | $0.9767$ | $\mathbf{1.0000}$ | $0.82\text{ ms}$ | **PASS (ASIL-D Compliant)** |
+| **Clean Fleet Baseline (Dataset C2)** | Fleet Reverse Drive | $0.00\%$ | $\mathbf{0.00\%}$ | $0.00\%$ | N/A | N/A | $0$ | $\mathbf{0}$ | N/A | N/A | $0.82\text{ ms}$ | **PASS (Zero False Alarms)** |
 
 ---
 

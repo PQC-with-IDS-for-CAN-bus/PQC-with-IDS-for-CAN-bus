@@ -465,7 +465,12 @@ int main(int argc, char* argv[]) {
                                     should_drop = true;
                                 }
                                 if (cfg.name == "monte_carlo" && rnd == 0 && cfg.loss_rate > 0.0) {
-                                    uint32_t h = (cfg.seed ^ (static_cast<uint32_t>(seq) * 2654435761u));
+                                    uint32_t h = cfg.seed ^ (static_cast<uint32_t>(seq + 1) * 0x9E3779B1u);
+                                    h ^= h >> 16;
+                                    h *= 0x85EBCA6Bu;
+                                    h ^= h >> 13;
+                                    h *= 0xC2B2AE35u;
+                                    h ^= h >> 16;
                                     double prob = (h % 10000) / 10000.0;
                                     if (prob < cfg.loss_rate) {
                                         should_drop = true;
@@ -481,15 +486,16 @@ int main(int argc, char* argv[]) {
                             }
                         }
 
+                        double frame_delay_us = cisg::timing::CANFDWireModel::calculate_frame_duration_us(frame.len, false);
+                        cisg::timing::CANFDWireModel::inject_wire_delay(frame_delay_us);
+
                         if (should_drop) {
                             if (frame.can_id == 0x200 && frame.len >= 2) {
                                 log_drop_event(active_run_id, d, frame.data[1], static_cast<uint8_t>(rnd));
                             }
-                            continue; // Injected fault drop
+                            continue; // Injected fault drop (after occupying wire for 331.5 us)
                         }
 
-                        double frame_delay_us = cisg::timing::CANFDWireModel::calculate_frame_duration_us(frame.len, false);
-                        cisg::timing::CANFDWireModel::inject_wire_delay(frame_delay_us);
                         ssize_t nw = write(s_out, &frame, sizeof(frame));
                         (void)nw;
                         if (d == 1 && s_att >= 0) {

@@ -70,8 +70,9 @@ def execute(domain, scenario, trial, seed):
                   admission_policy='observe' if mode=='clean' and trial==1 else 'enforce',
                   telemetry=bool(domain==1 and mode=='clean' and trial==1 and TELEMETRY))
     rpc('relay','/configure',config)
-    rpc(f'ecu{domain}','/prepare',config)
     rpc('gateway','/run',config)
+    time.sleep(0.002)  # Ensure gateway thread records started_ns and enters poll() before ECU TX
+    rpc(f'ecu{domain}','/prepare',config)
     deadline = time.monotonic()+35
     while True:
         gw = rpc('gateway')['domains'][str(domain)]
@@ -293,21 +294,38 @@ def main():
         capture = Path('/captures/candump.log')
         if capture.exists():
             (out/'candump_since_lab_start.log').write_bytes(capture.read_bytes())
-        arrivals = export_arrivals(out,events,records)
-        export_perf_stat(out, records)
-        artifacts=['fault_recovery_runs.csv','events.jsonl','measurement_profile.json','tcpdump_latency_summary.csv','perf_stat_summary.csv']
-        if (out/'candump_since_lab_start.log').exists():
-            artifacts.append('candump_since_lab_start.log')
+        arrivals = export_arrivals(out, events, records)
         import subprocess
         try:
-            perf = subprocess.run(['perf','stat','-x,','-e','cycles,instructions','--','true'],capture_output=True,text=True)
+            perf = subprocess.run(
+                ['perf', 'stat', '-x,', '-e', 'cycles,instructions', '--', '/usr/local/bin/cisg_gateway', '--verify'],
+                capture_output=True, text=True
+            )
             perf_code = perf.returncode
             perf_err = perf.stderr
         except Exception:
             perf_code = -1
             perf_err = "perf not available"
         (out/'perf_probe.txt').write_text(perf_err)
-        artifacts.append('perf_probe.txt')
+
+        def _avg_ns(node_role, key):
+            vals = [r[node_role].get(key, 0) for r in records.values() if r[node_role].get(key, 0) > 0]
+            return int(sum(vals) / len(vals)) if vals else None
+
+        measured_timings = {
+            'mldsa_verify_attestation': _avg_ns('gateway', 'mldsa_verify_ns'),
+            'mldsa_sign_attestation': _avg_ns('ecu', 'mldsa_sign_ns'),
+            'ascon_aead128_decrypt': _avg_ns('gateway', 'ascon_decrypt_ns'),
+            'ascon_aead128_encrypt': _avg_ns('ecu', 'ascon_encrypt_ns'),
+            'tier1_ascon_tag_verification': _avg_ns('gateway', 'ascon_decrypt_ns'),
+            'tier2_onnx_int8_inference': _avg_ns('gateway', 'onnx_int8_ns'),
+        }
+        measured_timings = {k: v for k, v in measured_timings.items() if v is not None}
+        export_perf_stat(out, records, measured_timings=measured_timings, perf_stderr=perf_err if perf_code == 0 else None)
+        artifacts = ['fault_recovery_runs.csv', 'events.jsonl', 'measurement_profile.json',
+                     'tcpdump_latency_summary.csv', 'perf_stat_summary.csv', 'perf_probe.txt']
+        if (out/'candump_since_lab_start.log').exists():
+            artifacts.append('candump_since_lab_start.log')
 
         crypto_code_dir = (ROOT/'Phase 1/CAN FD/Crypto Code') if (ROOT/'Phase 1/CAN FD/Crypto Code').exists() else (ROOT.parent/'Git repo/Phase 1/CAN FD/Crypto Code')
         schemas_file = (ROOT/'Phase 3/config/data_contract_schemas.json') if (ROOT/'Phase 3/config/data_contract_schemas.json').exists() else (ROOT.parent/'Git repo/Phase 3/config/data_contract_schemas.json')

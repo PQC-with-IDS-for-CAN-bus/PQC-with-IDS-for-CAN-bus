@@ -72,14 +72,26 @@ class DataContractValidator:
 
             # 2. Row by row validation
             row_idx = 1
+            valid_row_count = 0
+            seen_session_channels = set()
             for row in reader:
                 row_idx += 1
                 if not row or (len(row) == 1 and row[0].strip() == ''):
                     continue  # Skip empty trailing lines
                 
+                valid_row_count += 1
                 if len(row) != len(header):
                     errors.append(f"Row {row_idx}: column count mismatch (got {len(row)}, expected {len(header)})")
                     continue
+
+                row_map = {k: v.strip() for k, v in zip(header, row)}
+                sess_ch_key = (row_map.get('session_id', ''), row_map.get('bus_channel', ''))
+                is_subsequent_session_row = (
+                    contract_name == 'tcpdump_latency_summary'
+                    and sess_ch_key in seen_session_channels
+                )
+                if contract_name == 'tcpdump_latency_summary' and sess_ch_key[0]:
+                    seen_session_channels.add(sess_ch_key)
 
                 for col_name, raw_val in zip(header, row):
                     if col_name not in col_specs:
@@ -92,6 +104,11 @@ class DataContractValidator:
                     if val_str == '' or val_str.lower() == 'null':
                         if not is_nullable:
                             errors.append(f"Row {row_idx}, Column '{col_name}': Non-nullable field is empty/null")
+                        elif is_subsequent_session_row and col_name in ('ifat_us', 'arrival_jitter_ns'):
+                            errors.append(
+                                f"Row {row_idx}, Column '{col_name}': Non-initial frame in session "
+                                f"'{sess_ch_key[0]}' (bus_channel {sess_ch_key[1]}) cannot have null {col_name}"
+                            )
                         continue
 
                     # Type and value checks
@@ -149,9 +166,8 @@ class DataContractValidator:
                         if 'min' in v_rules and typed_val is not None:
                             if typed_val < v_rules['min']:
                                 errors.append(f"Row {row_idx}, Column '{col_name}': Value {typed_val} violates min bound ({v_rules['min']})")
-                        if 'max' in v_rules and typed_val is not None:
-                            if typed_val > v_rules['max']:
-                                errors.append(f"Row {row_idx}, Column '{col_name}': Value {typed_val} violates max bound ({v_rules['max']})")
+                        if 'max' in v_rules and typed_rules_max(v_rules, typed_val):
+                            errors.append(f"Row {row_idx}, Column '{col_name}': Value {typed_val} violates max bound ({v_rules['max']})")
                         if 'allowed' in v_rules and typed_val is not None:
                             if typed_val not in v_rules['allowed']:
                                 errors.append(f"Row {row_idx}, Column '{col_name}': Value {typed_val} not in allowed set {v_rules['allowed']}")
@@ -159,8 +175,14 @@ class DataContractValidator:
                             if typed_val != 0:
                                 errors.append(f"Row {row_idx}, Column '{col_name}': ASIL-D VIOLATION: Major page faults must be 0, got {typed_val}")
 
+            if valid_row_count == 0:
+                errors.append(f"CSV file contains header only (0 data rows); at least 1 data row is required: {csv_path}")
+
         is_valid = (len(errors) == 0)
         return is_valid, errors
+
+def typed_rules_max(v_rules: Dict[str, Any], typed_val: Any) -> bool:
+    return 'max' in v_rules and typed_val is not None and typed_val > v_rules['max']
 
 if __name__ == '__main__':
     validator = DataContractValidator()

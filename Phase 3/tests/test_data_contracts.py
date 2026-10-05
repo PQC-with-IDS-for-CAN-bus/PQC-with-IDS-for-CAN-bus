@@ -214,6 +214,43 @@ class TestNegativeMalformedDataRejection(unittest.TestCase):
         finally:
             os.remove(temp_csv)
 
+    def test_rejects_header_only_csv(self):
+        path = os.path.join(FIXTURES_DIR, 'sample_tcpdump_latency_summary.csv')
+        with open(path, 'r', encoding='utf-8') as f:
+            header = f.readline().strip().split(',')
+
+        temp_csv = self._create_temp_csv(header, [])
+        try:
+            valid, errors = self.validator.validate_csv('tcpdump_latency_summary', temp_csv)
+            self.assertFalse(valid)
+            self.assertTrue(any('0 data rows' in e or 'header only' in e for e in errors))
+        finally:
+            os.remove(temp_csv)
+
+    def test_rejects_mid_session_null_ifat_or_jitter(self):
+        path = os.path.join(FIXTURES_DIR, 'sample_tcpdump_latency_summary.csv')
+        with open(path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+        header = lines[0].strip().split(',')
+        ifat_idx = header.index('ifat_us')
+        jitter_idx = header.index('arrival_jitter_ns')
+
+        row0 = lines[1].strip().split(',')
+        row1 = lines[2].strip().split(',')
+        row1[ifat_idx] = ''
+        row1[jitter_idx] = ''
+
+        temp_csv = self._create_temp_csv(header, [row0, row1])
+        try:
+            valid, errors = self.validator.validate_csv('tcpdump_latency_summary', temp_csv)
+            self.assertFalse(valid)
+            self.assertTrue(any('ifat_us' in e and 'Non-initial frame' in e for e in errors))
+            self.assertTrue(any('arrival_jitter_ns' in e and 'Non-initial frame' in e for e in errors))
+        finally:
+            os.remove(temp_csv)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+

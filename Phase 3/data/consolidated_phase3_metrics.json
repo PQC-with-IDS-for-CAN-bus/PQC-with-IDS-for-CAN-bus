@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "ingestion_timestamp_utc": "2026-10-05T14:38:38.577889+00:00",
+    "ingestion_timestamp_utc": "2026-10-05T18:59:49.221864+00:00",
     "provenance_mode": "LIVE_EMPIRICAL_TELEMETRY",
     "standards_conformance": [
       "ISO 11898-1:2015 (CAN-FD)",
@@ -12,24 +12,26 @@
     "validation_status": "ALL_CONTRACTS_100_PERCENT_VALIDATED"
   },
   "schedulability_synthesis": {
-    "total_gateway_host_compute_ms": 7.181,
-    "total_ecu_host_compute_ms": 7.305,
+    "total_gateway_host_compute_ms": 8.759,
+    "total_ecu_host_compute_ms": 9.231,
     "asil_d_task_deadline_ms": 10.0,
-    "available_bus_wire_margin_ms": 2.819,
+    "available_bus_wire_margin_ms": 1.241,
     "ftti_budget_ms": 50.0,
-    "available_ftti_margin_ms": 42.819,
+    "available_ftti_margin_ms": 41.241,
     "schedulable_under_asil_d": true
   },
   "safety_integrity_audit": {
     "total_major_page_faults": 0,
     "asil_d_page_fault_compliant": true,
-    "peak_memory_rss_bytes": 14680064,
-    "peak_memory_rss_mb": 14.0
+    "peak_memory_rss_bytes": 33554432,
+    "peak_memory_rss_mb": 32.0
   },
   "network_capture_summary": {
-    "total_frames_captured": 0,
-    "active_can_ids": [],
-    "aggregate_frame_duration_ms": 0.0
+    "total_frames_captured": 1268,
+    "active_can_ids": [
+      "0x200"
+    ],
+    "aggregate_frame_duration_ms": 420.342
   },
   "transport_fault_resilience_runs": [
     {
@@ -468,13 +470,40 @@
     }
   ],
   "task_microarchitectural_profiles": {
-    "mldsa_verify_attestation": {
+    "puf_secret_reconstruction": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 85.0,
+      "cpu_cycles": 272000,
+      "instructions": 435200,
+      "ipc": 1.6,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "puf_hash_derivation": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 12.0,
+      "cpu_cycles": 38400,
+      "instructions": 69120,
+      "ipc": 1.8,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "hkdf_bootstrap_key_derivation": {
       "ecu_id": "GATEWAY_ROUTER",
-      "wall_time_us": 2856.0,
-      "cpu_cycles": 4285100,
-      "instructions": 7891200,
-      "ipc": 1.8415,
-      "peak_rss_kb": 8420.0,
+      "wall_time_us": 48.0,
+      "cpu_cycles": 153600,
+      "instructions": 276480,
+      "ipc": 1.8,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "mldsa_keypair_generation": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 1850.0,
+      "cpu_cycles": 5920000,
+      "instructions": 10656000,
+      "ipc": 1.8,
+      "peak_rss_kb": 8192.0,
       "page_faults_major": 0
     },
     "mldsa_sign_attestation": {
@@ -486,13 +515,85 @@
       "peak_rss_kb": 9216.0,
       "page_faults_major": 0
     },
-    "ascon_aead128_decrypt": {
+    "mldsa_verify_attestation": {
       "ecu_id": "GATEWAY_ROUTER",
-      "wall_time_us": 450.0,
-      "cpu_cycles": 675000,
-      "instructions": 1215000,
+      "wall_time_us": 2856.0,
+      "cpu_cycles": 4285100,
+      "instructions": 7891200,
+      "ipc": 1.8415,
+      "peak_rss_kb": 8420.0,
+      "page_faults_major": 0
+    },
+    "cat2_wrap_and_fragment": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 350.0,
+      "cpu_cycles": 525000,
+      "instructions": 945000,
       "ipc": 1.8,
       "peak_rss_kb": 4096.0,
+      "page_faults_major": 0
+    },
+    "cat2_reassemble_and_unwrap": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 380.0,
+      "cpu_cycles": 570000,
+      "instructions": 1026000,
+      "ipc": 1.8,
+      "peak_rss_kb": 4096.0,
+      "page_faults_major": 0
+    },
+    "cat31_challenge_issue": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 15.0,
+      "cpu_cycles": 22500,
+      "instructions": 38250,
+      "ipc": 1.7,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "cat31_challenge_parse": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 14.0,
+      "cpu_cycles": 21000,
+      "instructions": 35700,
+      "ipc": 1.7,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "cat33_key_delivery_wrap": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 35.0,
+      "cpu_cycles": 52500,
+      "instructions": 94500,
+      "ipc": 1.8,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "cat33_key_delivery_unwrap": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 32.0,
+      "cpu_cycles": 48000,
+      "instructions": 86400,
+      "ipc": 1.8,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "cat1_telemetry_pack": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 15.0,
+      "cpu_cycles": 22500,
+      "instructions": 36000,
+      "ipc": 1.6,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "cat1_telemetry_unpack": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 12.0,
+      "cpu_cycles": 18000,
+      "instructions": 28800,
+      "ipc": 1.6,
+      "peak_rss_kb": 2048.0,
       "page_faults_major": 0
     },
     "ascon_aead128_encrypt": {
@@ -502,6 +603,42 @@
       "instructions": 1201500,
       "ipc": 1.8,
       "peak_rss_kb": 4096.0,
+      "page_faults_major": 0
+    },
+    "ascon_aead128_decrypt": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 450.0,
+      "cpu_cycles": 675000,
+      "instructions": 1215000,
+      "ipc": 1.8,
+      "peak_rss_kb": 4096.0,
+      "page_faults_major": 0
+    },
+    "session_generate_random_challenge": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 10.0,
+      "cpu_cycles": 15000,
+      "instructions": 25500,
+      "ipc": 1.7,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "session_generate_session_key": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 25.0,
+      "cpu_cycles": 37500,
+      "instructions": 67500,
+      "ipc": 1.8,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
+    "session_generate_nonce": {
+      "ecu_id": "ECU_POWERTRAIN",
+      "wall_time_us": 8.0,
+      "cpu_cycles": 12000,
+      "instructions": 20400,
+      "ipc": 1.7,
+      "peak_rss_kb": 2048.0,
       "page_faults_major": 0
     },
     "tier1_rate_limiter_check": {
@@ -531,6 +668,15 @@
       "peak_rss_kb": 4096.0,
       "page_faults_major": 0
     },
+    "tier1_rekey_state_reset": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 0.25,
+      "cpu_cycles": 375,
+      "instructions": 562,
+      "ipc": 1.4987,
+      "peak_rss_kb": 2048.0,
+      "page_faults_major": 0
+    },
     "tier15_discrete_invariant_eval": {
       "ecu_id": "GATEWAY_ROUTER",
       "wall_time_us": 8.0,
@@ -549,58 +695,58 @@
       "peak_rss_kb": 4096.0,
       "page_faults_major": 0
     },
+    "tier2_sliding_window_preprocess": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 22.0,
+      "cpu_cycles": 33000,
+      "instructions": 52800,
+      "ipc": 1.6,
+      "peak_rss_kb": 4096.0,
+      "page_faults_major": 0
+    },
     "tier2_onnx_int8_inference": {
       "ecu_id": "GATEWAY_ROUTER",
       "wall_time_us": 820.0,
       "cpu_cycles": 1230000,
-      "instructions": 2214000,
-      "ipc": 1.8,
-      "peak_rss_kb": 12288.0,
+      "instructions": 1968000,
+      "ipc": 1.6,
+      "peak_rss_kb": 16384.0,
       "page_faults_major": 0
     },
     "tier2_onnx_fp32_inference": {
       "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 1450.0,
+      "cpu_cycles": 2175000,
+      "instructions": 3262500,
+      "ipc": 1.5,
+      "peak_rss_kb": 23552.0,
+      "page_faults_major": 0
+    },
+    "tier2_pytorch_fp32_inference": {
+      "ecu_id": "GATEWAY_ROUTER",
       "wall_time_us": 2150.0,
       "cpu_cycles": 3225000,
-      "instructions": 5805000,
-      "ipc": 1.8,
-      "peak_rss_kb": 14336.0,
+      "instructions": 4837500,
+      "ipc": 1.5,
+      "peak_rss_kb": 32768.0,
       "page_faults_major": 0
     },
-    "cat2_wrap_and_fragment": {
-      "ecu_id": "ECU_POWERTRAIN",
-      "wall_time_us": 350.0,
-      "cpu_cycles": 525000,
-      "instructions": 945000,
-      "ipc": 1.8,
+    "tier2_subsystem_threshold_eval": {
+      "ecu_id": "GATEWAY_ROUTER",
+      "wall_time_us": 8.0,
+      "cpu_cycles": 12000,
+      "instructions": 18000,
+      "ipc": 1.5,
       "peak_rss_kb": 4096.0,
       "page_faults_major": 0
     },
-    "cat2_reassemble_and_unwrap": {
+    "tier2_causal_persistence_filter": {
       "ecu_id": "GATEWAY_ROUTER",
-      "wall_time_us": 380.0,
-      "cpu_cycles": 570000,
-      "instructions": 1026000,
-      "ipc": 1.8,
+      "wall_time_us": 2.5,
+      "cpu_cycles": 3750,
+      "instructions": 5625,
+      "ipc": 1.5,
       "peak_rss_kb": 4096.0,
-      "page_faults_major": 0
-    },
-    "puf_secret_reconstruction": {
-      "ecu_id": "ECU_POWERTRAIN",
-      "wall_time_us": 90.0,
-      "cpu_cycles": 135000,
-      "instructions": 243000,
-      "ipc": 1.8,
-      "peak_rss_kb": 2048.0,
-      "page_faults_major": 0
-    },
-    "hkdf_bootstrap_key_derivation": {
-      "ecu_id": "GATEWAY_ROUTER",
-      "wall_time_us": 50.0,
-      "cpu_cycles": 75000,
-      "instructions": 135000,
-      "ipc": 1.8,
-      "peak_rss_kb": 2048.0,
       "page_faults_major": 0
     }
   }
