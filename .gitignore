@@ -224,3 +224,6 @@ __pycache__/
 
 # Local runtime retained after DockerLab moved to Phase 3
 /Phase 2/DockerLab/state/
+
+# Local research document rendering and authoring intermediates
+/tmp/research_project/

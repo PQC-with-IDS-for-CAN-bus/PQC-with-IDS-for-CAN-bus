@@ -1,0 +1,42 @@
+{
+  "paper_corrected.pdf": {
+    "bytes": 4503334,
+    "sha256": "069afec498dbdd520e3357a6d3ef9fbfb69cf0bd38dc814d570da8178c22edca"
+  },
+  "IEEE_Conference_Paper_Figures_and_Descriptions.docx": {
+    "bytes": 15189378,
+    "sha256": "7d7037c368c97ef568fb15ff1528112add3bc121ccd138370b53f17643dc3a70"
+  },
+  "BCE497J PROJECT REPORT TEMPLATE_V1.docx": {
+    "bytes": 390524,
+    "sha256": "ca57b2550e9d622332242dd6c61030d81df6fb93b24356a09c34a56c5c19de87"
+  },
+  "Phase 3/DockerLab/simulation_results/fault_recovery_runs.csv": {
+    "bytes": 11258,
+    "sha256": "49f1ec247961fa03d7cadf378e6c57e4fb19b4861c7177e79bd4f0e320a1e56b"
+  },
+  "Phase 3/DockerLab/simulation_results/manifest.json": {
+    "bytes": 295374,
+    "sha256": "aab3e3b020f13a4cc4d5d79d3f06b0e62ff4acb34c0622e16bc312efe5753b69"
+  },
+  "Phase 3/data/fault_recovery_runs.csv": {
+    "bytes": 10818,
+    "sha256": "93dddec9f3fd0f08f82a816691d70ed05c0e7ea207cd694d00c14646da41bb2a"
+  },
+  "Phase 2/IDS/ONNX/v30_physical_kinematics_fp32.onnx": {
+    "bytes": 108879,
+    "sha256": "a887f9761ed377da7f9e79204863d850df64b05611ada92c63224c16b8570023"
+  },
+  "Phase 2/IDS/ONNX/v30_physical_kinematics_dynamic_int8.onnx": {
+    "bytes": 39254,
+    "sha256": "96574ffa2a472e2d2d6ec274efe310a5d1bdc21c1ec5aef3c1abc82b48f2a427"
+  },
+  "Phase 2/IDS/ONNX/master_3tier_real_benchmark_leaderboard.csv": {
+    "bytes": 3357,
+    "sha256": "4744b0d428c8fcdb94d45a186c664cde568c1e8c0cea6528c3590a734c831d21"
+  },
+  "Phase 2/IDS/FL IDS/fl_attack_benchmark_results.csv": {
+    "bytes": 340,
+    "sha256": "af0f002aaecb95d1c55343357e0d83c5552896f1628ce68665362af7b992b543"
+  }
+}
